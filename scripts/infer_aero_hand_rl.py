@@ -178,11 +178,41 @@ def list_hand_ports() -> list[str]:
 
 
 def resolve_checkpoint(path_or_latest: str, env_name: str = ENV_NAME) -> Path:
-    """Resolve ``latest`` or a path to an Orbax checkpoint *step* directory."""
+    """Resolve ``latest`` or a path to an Orbax checkpoint *step* directory.
+
+    Relative paths are tried against cwd, the repo root, and the playground
+    dir (the infer wrapper ``cd``s into playground before launch).
+    """
     if path_or_latest != "latest":
-        ckpt = Path(path_or_latest).expanduser().resolve()
-        if not ckpt.exists():
-            raise SystemExit(f"checkpoint path does not exist: {ckpt}")
+        raw = Path(path_or_latest).expanduser()
+        candidates: list[Path] = []
+        if raw.is_absolute():
+            candidates.append(raw)
+        else:
+            candidates.extend(
+                [
+                    Path.cwd() / raw,
+                    _REPO_ROOT / raw,
+                    _PLAYGROUND_DIR / raw,
+                ]
+            )
+            # Repo-relative path used while already inside playground.
+            parts = raw.parts
+            marker = ("sim_rl", "mujoco_playground")
+            if len(parts) >= 2 and parts[:2] == marker:
+                candidates.append(_PLAYGROUND_DIR / Path(*parts[2:]))
+
+        ckpt = None
+        for cand in candidates:
+            resolved = cand.resolve()
+            if resolved.exists():
+                ckpt = resolved
+                break
+        if ckpt is None:
+            tried = ", ".join(str(c.resolve()) for c in candidates)
+            raise SystemExit(
+                f"checkpoint path does not exist: {path_or_latest}\n tried: {tried}"
+            )
         # Allow pointing at logs/.../checkpoints or a numeric step dir.
         if ckpt.is_dir() and ckpt.name == "checkpoints":
             return _latest_step_dir(ckpt)

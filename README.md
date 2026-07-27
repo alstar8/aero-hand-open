@@ -34,6 +34,7 @@ Play a checkpoint:
 ```bash
 ./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path PATH
 ./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path latest
+./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis-20260727-194230-baseline/checkpoints/000066846720
 ```
 
 ## Real-hand RL inference
@@ -44,6 +45,7 @@ Run a trained `AeroCubeRotateZAxis` policy on the Aero Hand Open. Moves to the s
 
 # Real hand
 ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint latest --gpu 1 --duration 30
+./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis-20260727-194230-baseline/checkpoints/000066846720 --gpu 0 --duration 30
 ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint PATH --gpu 1
 ./scripts/infer_aero_hand_rl.sh --cube-pose zed --checkpoint latest --gpu 1
 ./scripts/infer_aero_hand_rl.sh --list-ports

@@ -176,6 +176,39 @@ resolve_latest_checkpoint() {
   log "resolved --load_checkpoint_path latest -> ${LOAD_CHECKPOINT_PATH}"
 }
 
+# Absolutize checkpoint paths so repo-relative args still work after cd into
+# PLAYGROUND_DIR (avoids .../mujoco_playground/sim_rl/mujoco_playground/logs/...).
+resolve_checkpoint_path() {
+  local raw="${LOAD_CHECKPOINT_PATH}"
+  local cand=""
+  local prefix="sim_rl/mujoco_playground/"
+
+  [[ -n "${raw}" ]] || return 0
+  [[ "${raw}" == "latest" ]] && return 0
+
+  if [[ "${raw}" = /* ]]; then
+    [[ -e "${raw}" ]] || die "checkpoint path does not exist: ${raw}"
+    LOAD_CHECKPOINT_PATH="$(cd "${raw}" 2>/dev/null && pwd || readlink -f "${raw}")"
+    return 0
+  fi
+
+  for cand in \
+    "${REPO_ROOT}/${raw}" \
+    "${PLAYGROUND_DIR}/${raw}" \
+    "${PLAYGROUND_DIR}/${raw#"${prefix}"}"; do
+    if [[ -e "${cand}" ]]; then
+      LOAD_CHECKPOINT_PATH="$(cd "${cand}" 2>/dev/null && pwd || readlink -f "${cand}")"
+      log "resolved --load_checkpoint_path -> ${LOAD_CHECKPOINT_PATH}"
+      return 0
+    fi
+  done
+
+  die "checkpoint path does not exist: ${raw}
+ tried: ${REPO_ROOT}/${raw}
+        ${PLAYGROUND_DIR}/${raw}
+        ${PLAYGROUND_DIR}/${raw#"${prefix}"}"
+}
+
 build_train_args() {
   TRAIN_ARGS=(--env_name "${ENV_NAME}")
 
@@ -192,6 +225,8 @@ build_train_args() {
       "--play_only requires --load_checkpoint_path (path or 'latest')"
     if [[ "${LOAD_CHECKPOINT_PATH}" == "latest" ]]; then
       resolve_latest_checkpoint
+    else
+      resolve_checkpoint_path
     fi
     TRAIN_ARGS+=(--play_only --load_checkpoint_path "${LOAD_CHECKPOINT_PATH}")
   fi
