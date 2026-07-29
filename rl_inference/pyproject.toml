@@ -1,0 +1,24 @@
+[project]
+name = "aero-hand-rl-inference"
+version = "0.1.0"
+description = "Real-hardware inference harness for RL (PPO/SAC) policies trained on the Aero Hand via mujoco_playground."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = { text = "Apache License 2.0" }
+
+dependencies = [
+    "aero-open-sdk",
+    "playground",
+    "brax==0.14.2",
+    "jax>=0.4",
+    "opencv-python>=4.8",
+    "scipy>=1.11",
+    "numpy>=1.26",
+]
+
+[tool.uv.sources]
+aero-open-sdk = { path = "../sdk", editable = true }
+playground = { path = "../sim_rl/mujoco_playground", editable = true }
+
+[tool.uv]
+package = false

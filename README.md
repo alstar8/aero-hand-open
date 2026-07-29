@@ -148,6 +148,8 @@ We offer reinforcement learning tools built on top of state-of-the-art framework
 Refer to the [RL and Sim](https://docs.tetheria.ai/docs/hand_sim) documentation and the [`sim_rl/mujoco_playground/`](./sim_rl/mujoco_playground/) directory for full setup instructions and training procedures.  
 An example of deploying trained policies in ROS is also provided in the [`ros2/`](./ros2/) directory.
 
+For running a trained checkpoint directly on the physical hand (calibration, live inference, sim-vs-real comparison tooling), see [`rl_inference/`](./rl_inference/), which also ships a validated `AeroCubeRotateZAxis` PPO checkpoint.
+
 
 # Getting help
 

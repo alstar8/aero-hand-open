@@ -1,0 +1,127 @@
+diff -ruN old/mujoco_playground/_src/manipulation/aero_hand/aero_hand_constants.py new/mujoco_playground/_src/manipulation/aero_hand/aero_hand_constants.py
+--- old/mujoco_playground/_src/manipulation/aero_hand/aero_hand_constants.py	2026-07-29 20:09:36.274402972 +0300
++++ new/mujoco_playground/_src/manipulation/aero_hand/aero_hand_constants.py	2026-07-29 20:09:36.280059433 +0300
+@@ -16,6 +16,8 @@
+ 
+ """Constants for TetherIA Aero Hand Open."""
+ 
++import jax.numpy as jp
++
+ from mujoco_playground._src import mjx_env
+ 
+ ROOT_PATH = mjx_env.ROOT_PATH / "manipulation" / "aero_hand"
+@@ -85,3 +87,20 @@
+ SENSOR_JOINT_NAMES = [
+     "len_th_abd",
+ ]
++
++# Grasp-primed reset pose: hand + cube qpos captured from a step of a
++# successful policy rollout (checkpoint AeroCubeRotateZAxis-20260717-143413
++# /000267386880) where the cube was engaged by palm + finger-phalange
++# contacts (6 simultaneous contacts: palm_collision_7/8, and phalange geoms
++# on index/ring/middle), rather than by the 5 fingertips as originally
++# assumed. Scripted attempts to reach a fingertip-only 5-point grasp via
++# closing motions from the open default_pose never exceeded 2 simultaneous
++# fingertip contacts (confirmed by grid search over cube drop position) --
++# capturing a real in-episode policy state was the only approach that
++# produced a rich multi-contact grasp.
++GRASP_HAND_QPOS = jp.array([
++    0.77116, 0.00795, 0.01088, 0.15421, 0.03956, 0.04278, 1.59756, 0.11993,
++    0.12498, 1.43895, 0.56571, 0.56787, 0.47439, 0.38979, 0.36383, 0.3671,
++])
++GRASP_CUBE_POS = jp.array([0.13435, -0.00865, -0.03007])
++GRASP_CUBE_QUAT = jp.array([-0.92177, 0.07448, -0.19901, 0.32431])
+diff -ruN old/mujoco_playground/_src/manipulation/aero_hand/rotate_z.py new/mujoco_playground/_src/manipulation/aero_hand/rotate_z.py
+--- old/mujoco_playground/_src/manipulation/aero_hand/rotate_z.py	2026-07-29 20:09:36.273170740 +0300
++++ new/mujoco_playground/_src/manipulation/aero_hand/rotate_z.py	2026-07-29 20:09:36.277765203 +0300
+@@ -31,6 +31,7 @@
+ 
+ def default_config() -> config_dict.ConfigDict:
+   return config_dict.create(
++      impl="jax",
+       ctrl_dt=0.05,
+       sim_dt=0.01,
+       action_scale=[0.02, 0.02, 0.02, 0.02, 0.7, 0.003, 0.012],
+@@ -50,7 +51,16 @@
+               angvel=1.0,
+               linvel=0.0,
+               pose=0.0,
+-              torques=0.0,
++              # Real-hand testing showed a single finger (middle, or pinky
++              # depending on checkpoint) locking into a rigid, static hold
++              # that either prevents rotation entirely or lets the cube slip
++              # -- nothing in the reward previously discouraged high sustained
++              # actuator force, so a hard clamp-and-freeze was a "safe" local
++              # optimum. Small negative weight to discourage that without
++              # overpowering angvel/termination (conservative on purpose,
++              # after action_lower_frac=0 fully collapsed the reward when
++              # tried too aggressively).
++              torques=-0.0001,  # was -0.001; that fully collapsed the reward too
+               energy=0.0,
+               termination=-100.0,
+               action_rate=-1.0,
+@@ -88,9 +98,21 @@
+     self._lowers, self._uppers = self.mj_model.jnt_range[self._hand_qids].T
+ 
+     self._init_tendon = jp.array(home_key.ctrl)
+-    self._default_tendon = self._init_tendon
++    # Bias the pinky (ACTUATOR_NAMES[3]) more flexed by default -- on real
++    # hardware, the pinky was observed to be the finger that let the cube
++    # slip/fall. Offset is 75% of pinky's own action_scale (0.02m), so the
++    # baseline shifts noticeably toward closed while still leaving some
++    # travel room in both directions.
++    self._default_tendon = self._init_tendon.at[3].add(0.015)
+ 
+   def reset(self, rng: jax.Array) -> mjx_env.State:
++    # NOTE: the grasp-primed reset pose (consts.GRASP_HAND_QPOS/GRASP_CUBE_*)
++    # used here previously was captured from a policy rollout on the old
++    # 50mm cube. The real cube is 38mm -- that captured pose no longer
++    # corresponds to a valid contact configuration for the new cube size, so
++    # this reverts to the original open-hand / randomized-cube reset. A new
++    # grasp-primed pose can be recaptured from a rollout of whatever policy
++    # this training produces, once trained on the corrected cube size.
+     # Randomize hand qpos and qvel.
+     rng, pos_rng, vel_rng = jax.random.split(rng, 3)
+     q_hand = jp.clip(
+@@ -162,8 +184,10 @@
+     for k, v in rewards.items():
+       state.metrics[f"reward/{k}"] = v
+ 
+-    done = done.astype(reward.dtype)
+-    state = state.replace(data=data, obs=obs, reward=reward, done=done)
++    done = done.astype(reward.dtype)  # pyrefly: ignore[missing-attribute]
++    state = state.replace(
++        data=data, obs=obs, reward=reward, done=done
++    )  # pyrefly: ignore[missing-attribute]
+     return state
+ 
+   def _get_termination(self, data: mjx.Data) -> jax.Array:
+@@ -449,7 +473,7 @@
+       "actuator_biasprm": 0,
+   })
+ 
+-  model = model.tree_replace({
++  model = model.tree_replace({  # pyrefly: ignore[bad-assignment]
+       "geom_friction": geom_friction,
+       "body_mass": body_mass,
+       "body_inertia": body_inertia,
+diff -ruN old/mujoco_playground/_src/manipulation/aero_hand/xmls/reorientation_cube.xml new/mujoco_playground/_src/manipulation/aero_hand/xmls/reorientation_cube.xml
+--- old/mujoco_playground/_src/manipulation/aero_hand/xmls/reorientation_cube.xml	2026-07-29 20:09:36.276825685 +0300
++++ new/mujoco_playground/_src/manipulation/aero_hand/xmls/reorientation_cube.xml	2026-07-29 20:09:36.280937465 +0300
+@@ -8,14 +8,14 @@
+   <asset>
+     <texture name="dexcube" type="2d" file="reorientation_cube_textures/dex_cube.png"/>
+     <material name="dexcube" texture="dexcube"/>
+-    <mesh name="cube_mesh" file="dex_cube.obj" scale="0.025 0.025 0.025"/>
++    <mesh name="cube_mesh" file="dex_cube.obj" scale="0.019 0.019 0.019"/>
+   </asset>
+ 
+   <worldbody>
+     <body name="cube" pos="0.11 0.0 0.1" quat="1 0 0 0" childclass="cube">
+       <freejoint name="cube_freejoint"/>
+       <geom type="mesh" mesh="cube_mesh" material="dexcube" contype="0" conaffinity="0" density="0" group="2"/>
+-      <geom name="cube" type="box" size=".025 .025 .025" mass=".0692" group="3"/>
++      <geom name="cube" type="box" size=".019 .019 .019" mass=".0274" group="3"/>
+       <site name="cube_center" pos="0 0 0" group="4"/>
+     </body>
+   </worldbody>
