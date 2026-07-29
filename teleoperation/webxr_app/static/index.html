@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Aero Hand VR teleop</title>
+  <link rel="stylesheet" href="./style.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="info">
+    Tap <b>Enter VR</b> from the Quest browser.<br>
+    Backend: <code>uv run python -m server</code>.<br>
+    Pinch left thumb + index to advance calibration.
+  </div>
+  <button id="enter">Enter VR</button>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

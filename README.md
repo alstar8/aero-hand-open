@@ -70,3 +70,25 @@ pip install -e sdk
 ./scripts/demo_hand_dexterity.py --hold 1.0
 ```
 
+## VR teleoperation (WebXR)
+
+Track a Meta Quest operator's right hand and stream calibrated finger
+curls + thumb abduction to the real Aero Hand. Own `uv` project under
+`teleoperation/` -- see [teleoperation/README.md](teleoperation/README.md)
+for the full flow.
+
+```bash
+cd teleoperation
+uv sync
+
+mkdir -p certs
+openssl req -x509 -newkey rsa:2048 -keyout certs/key.pem \
+  -out certs/cert.pem -days 365 -nodes -subj "/CN=$(hostname -I | awk '{print $1}')"
+
+uv run python -m server --cert certs/cert.pem --key certs/key.pem
+```
+
+Open `https://<your-LAN-ip>:8000` in the Quest browser. Pinch left thumb
++ index to advance the 6-step finger calibration; once it completes, the
+tracked right hand drives the real hand directly.
+
