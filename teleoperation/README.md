@@ -1,12 +1,8 @@
 # Aero Hand VR teleoperation
 
 WebXR (Meta Quest) teleop for the bare Aero Hand Open: track the
-operator's right hand, calibrate finger range of motion, then stream
-finger curls + thumb abduction to the real hand over the SDK.
-
-No arm, no wrist/workspace tracking, no controllers -- this repo has no
-manipulator to carry a wrist through space, so the whole teleop surface
-is "what should the fingers do right now."
+operator's right hand, calibrate finger range of motion, then stream 
+to the real hand over the SDK.
 
 ## Quick start
 
@@ -71,5 +67,3 @@ teleoperation/
                            or camera rig here)
 ```
 
-Ported from [vr_arm_teleop](https://github.com/Akhunzianov/vr_arm_teleop),
-trimmed to the finger-only subset relevant to a bare hand.
