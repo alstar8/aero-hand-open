@@ -224,13 +224,31 @@ class AeroHand:
             return
 
     def _wait_for_ack(self, opcode: int, timeout_s: float) -> bytes:
+        """Wait for a 16-byte ACK frame matching ``opcode``.
+
+        Accumulates across partial USB reads. Discarding incomplete
+        ``read(16)`` results drops split ACK frames (common on
+        ESP32 USB-JTAG) and hangs until timeout after homing finishes.
+        """
         deadline = time.monotonic() + timeout_s
-        while time.monotonic() < deadline:
-            frame = self.ser.read(16)
-            if len(frame) != 16:
-                continue 
-            if frame[0] == (opcode & 0xFF) and frame[1] == 0x00:
-                return frame[2:]
+        buf = bytearray()
+        opcode_b = opcode & 0xFF
+        old_timeout = self.ser.timeout
+        try:
+            # Longer per-read timeout helps assemble multi-packet USB frames.
+            self.ser.timeout = 0.1
+            while time.monotonic() < deadline:
+                chunk = self.ser.read(16 - len(buf))
+                if chunk:
+                    buf.extend(chunk)
+                if len(buf) < 16:
+                    continue
+                if buf[0] == opcode_b and buf[1] == 0x00:
+                    return bytes(buf[2:16])
+                # Not our frame — slide one byte and keep scanning.
+                del buf[0]
+        finally:
+            self.ser.timeout = old_timeout
         raise TimeoutError(f"ACK (opcode 0x{opcode:02X}) not received within {timeout_s}s")
     
     def set_id(self, id: int, current_limit: int):

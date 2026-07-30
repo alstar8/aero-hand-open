@@ -4,6 +4,8 @@
 #
 # Usage:
 #   ./scripts/train_mujoco_rl_baseline.sh
+#   ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis38mm
+#   ./scripts/train_mujoco_rl_baseline.sh --env_name AeroCubeRotateZAxis38mm
 #   ./scripts/train_mujoco_rl_baseline.sh --gpu 1
 #   ./scripts/train_mujoco_rl_baseline.sh --smoke
 #   ./scripts/train_mujoco_rl_baseline.sh -- --use_tb --domain_randomization
@@ -18,6 +20,7 @@ set -euo pipefail
 DEFAULT_ENV_NAME="AeroCubeRotateZAxis"
 
 ENV_NAME="${ENV_NAME:-${DEFAULT_ENV_NAME}}"
+ENV_NAME_SET=0
 # GPU_ID / --gpu pin training to one device via CUDA_VISIBLE_DEVICES.
 GPU_ID="${GPU_ID:-}"
 SUFFIX=""
@@ -37,12 +40,17 @@ Uses the existing uv venv at sim_rl/mujoco_playground/.venv (run
 scripts/setup_mujoco_rl_env.sh first). Default env is AeroCubeRotateZAxis with
 the tuned brax PPO hyperparameters from mujoco_playground.
 
+Task name (optional positional, or --env_name):
+  AeroCubeRotateZAxis       50mm cube (default)
+  AeroCubeRotateZAxis38mm   38mm cube
+
 Options:
-  --env_name NAME              Environment name (default: AeroCubeRotateZAxis)
+  --env_name NAME              Environment / task name (default: AeroCubeRotateZAxis)
   --gpu ID                     CUDA device id (sets CUDA_VISIBLE_DEVICES)
   --suffix SUFFIX              Experiment name suffix
   --smoke                      Short sanity run (1e6 steps, 256 envs, 2 evals)
   --play_only                  Roll out a checkpoint instead of training
+                               (saves rollout*.mp4 under the resolved step dir)
   --load_checkpoint_path PATH  Checkpoint dir/file (required with --play_only).
                                Use "latest" to pick the newest run under
                                logs/<env_name>-*/checkpoints for --env_name.
@@ -50,6 +58,10 @@ Options:
   --use_wandb                  Enable Weights & Biases logging
   --domain_randomization       Enable domain randomization
   -h, --help                   Show this help
+
+Examples:
+  ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis38mm --gpu 0
+  ./scripts/train_mujoco_rl_baseline.sh --env_name AeroCubeRotateZAxis38mm --smoke
 
 GPU_ID=0 may be used instead of --gpu. Any args after -- are forwarded to
 learning/train_jax_ppo.py.
@@ -60,6 +72,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --env_name)
       ENV_NAME="${2:?--env_name requires a value}"
+      ENV_NAME_SET=1
       shift 2
       ;;
     --gpu)
@@ -103,9 +116,19 @@ while [[ $# -gt 0 ]]; do
       EXTRA_ARGS+=("$@")
       break
       ;;
-    *)
+    -*)
       # Forward unknown flags to train_jax_ppo.py (e.g. --seed 2).
       EXTRA_ARGS+=("$1")
+      shift
+      ;;
+    *)
+      # Positional task / env name (e.g. AeroCubeRotateZAxis38mm).
+      if [[ "${ENV_NAME_SET}" -eq 0 ]]; then
+        ENV_NAME="$1"
+        ENV_NAME_SET=1
+      else
+        EXTRA_ARGS+=("$1")
+      fi
       shift
       ;;
   esac
@@ -284,6 +307,10 @@ main() {
   unset LD_LIBRARY_PATH || true
   # Avoid JAX grabbing most of VRAM on shared GPUs (train_jax_ppo also sets this).
   export XLA_PYTHON_CLIENT_PREALLOCATE="${XLA_PYTHON_CLIENT_PREALLOCATE:-false}"
+  # Persist XLA compiles across restarts (train_jax_ppo enables the JAX cache).
+  # Without this, every cold start sits at ~0% GPU util while ptxas runs on CPU.
+  export JAX_COMPILATION_CACHE_DIR="${JAX_COMPILATION_CACHE_DIR:-${HOME}/.cache/jax}"
+  mkdir -p "${JAX_COMPILATION_CACHE_DIR}"
   # Headless EGL for post-train rollout videos (no X11 / monitor window).
   export MUJOCO_GL="${MUJOCO_GL:-egl}"
   export MPLBACKEND="${MPLBACKEND:-Agg}"

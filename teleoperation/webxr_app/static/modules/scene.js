@@ -57,28 +57,87 @@ export class Scene {
     if (!navigator.xr) {
       throw new Error('WebXR not available in this browser');
     }
-    // Prefer immersive-ar so Quest enables passthrough: the operator
-    // sees their real room and our content (point cloud, hands,
-    // controller, overlay) renders on top. Fall back to immersive-vr
-    // if AR isn't supported.
-    const optionalFeatures = [
-      'hand-tracking',
-      'simultaneous-hands-and-controllers',
-      'hand-input-with-controllers',
-    ];
-    let session;
-    const arSupported = await navigator.xr.isSessionSupported?.('immersive-ar');
-    if (arSupported) {
-      session = await navigator.xr.requestSession('immersive-ar', {
-        requiredFeatures: ['local-floor'],
-        optionalFeatures,
-      });
-    } else {
-      session = await navigator.xr.requestSession('immersive-vr', {
-        requiredFeatures: ['local-floor'],
-        optionalFeatures,
-      });
+
+    // Try AR (passthrough) first, then VR. Within each mode, fall back from
+    // richer feature sets to minimal ones — some Quest browser builds reject
+    // unknown optional feature strings (or local-floor) with
+    // "session configuration is not supported".
+    const modes = [];
+    if (await navigator.xr.isSessionSupported?.('immersive-ar')) {
+      modes.push('immersive-ar');
     }
+    if (await navigator.xr.isSessionSupported?.('immersive-vr')) {
+      modes.push('immersive-vr');
+    }
+    if (!modes.length) {
+      throw new Error(
+        'Neither immersive-ar nor immersive-vr is supported. ' +
+        'Open this page in the Meta Quest Browser over HTTPS.',
+      );
+    }
+
+    const featureSets = [
+      {
+        requiredFeatures: ['local-floor'],
+        optionalFeatures: ['hand-tracking'],
+        refSpace: 'local-floor',
+      },
+      {
+        requiredFeatures: ['local-floor'],
+        optionalFeatures: [
+          'hand-tracking',
+          'simultaneous-hands-and-controllers',
+          'hand-input-with-controllers',
+        ],
+        refSpace: 'local-floor',
+      },
+      {
+        // No required features — 'local' is always available.
+        requiredFeatures: [],
+        optionalFeatures: ['hand-tracking', 'local-floor'],
+        refSpace: 'local',
+      },
+      {
+        requiredFeatures: [],
+        optionalFeatures: ['hand-tracking'],
+        refSpace: 'local',
+      },
+    ];
+
+    let session = null;
+    let lastError = null;
+    let usedRefSpace = 'local-floor';
+    for (const mode of modes) {
+      for (const features of featureSets) {
+        try {
+          session = await navigator.xr.requestSession(mode, {
+            requiredFeatures: features.requiredFeatures,
+            optionalFeatures: features.optionalFeatures,
+          });
+          usedRefSpace = features.refSpace;
+          console.log(
+            `[xr] started ${mode} ref=${usedRefSpace} ` +
+            `required=${JSON.stringify(features.requiredFeatures)} ` +
+            `optional=${JSON.stringify(features.optionalFeatures)}`,
+          );
+          break;
+        } catch (e) {
+          lastError = e;
+          console.warn(
+            `[xr] ${mode} failed ` +
+            `(required=${JSON.stringify(features.requiredFeatures)}):`,
+            e,
+          );
+        }
+      }
+      if (session) break;
+    }
+
+    if (!session) {
+      throw lastError || new Error('No supported WebXR session configuration');
+    }
+
+    this.renderer.xr.setReferenceSpaceType(usedRefSpace);
     await this.renderer.xr.setSession(session);
   }
 

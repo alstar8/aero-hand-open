@@ -26,8 +26,12 @@ Run the server:
 uv run python -m server --cert certs/cert.pem --key certs/key.pem
 ```
 
-Open `https://<your-LAN-ip>:8000` in the Quest browser (or
-`http://localhost:8000` without TLS).
+Open `https://<your-LAN-ip>:8000` in the **Meta Quest Browser** (not on a
+PC). Accept the self-signed cert warning. Tap **Enter VR**.
+
+There is no desktop video stream — the headset *is* the client. Opening
+the page in Chrome/Firefox on your laptop will show
+`WebXR unavailable` / `XR start failed`.
 
 ## Flow
 
@@ -41,6 +45,20 @@ Open `https://<your-LAN-ip>:8000` in the Quest browser (or
    engage step -- it just starts.
 3. **Quit** -- Ctrl+C. The driver parks the hand open before releasing
    the serial port.
+
+## Troubleshooting XR start failed
+
+- **Opened on a PC browser.** Use the Quest headset browser at
+  `https://10.x.x.x:8000` (your LAN IP). Desktop browsers have no
+  immersive WebXR session for this app.
+- **Wrong URL / cert mismatch.** Cert CN must match the IP you type.
+  Regenerate with that IP in `-subj "/CN=..."`.
+- **HTTP instead of HTTPS on Quest.** WebXR on device requires TLS
+  (`--cert` / `--key`).
+- **Hand tracking off.** Quest Settings → Movement tracking → Hand
+  tracking → On. Put controllers down so bare hands are tracked.
+- After a failed attempt, hard-refresh the Quest page and tap Enter VR
+  again; the on-page error text now shows the browser's reason.
 
 ## CLI flags
 

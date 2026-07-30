@@ -72,13 +72,36 @@ const enterBtn = document.getElementById('enter');
 if (enterBtn) {
   if (!navigator.xr) {
     enterBtn.disabled = true;
-    enterBtn.textContent = 'WebXR unavailable';
+    enterBtn.textContent = 'WebXR unavailable (open on Quest browser)';
+    const info = document.getElementById('info');
+    if (info) {
+      info.insertAdjacentHTML(
+        'beforeend',
+        '<br><br><b>This page must be opened in the Meta Quest browser</b> ' +
+        '(HTTPS to your PC LAN IP). Desktop Chrome/Firefox cannot start ' +
+        'immersive VR/AR here — there is no video stream to watch on a PC.',
+      );
+    }
   } else {
     enterBtn.addEventListener('click', async () => {
-      try { await scene.startSession(); }
-      catch (e) {
+      try {
+        enterBtn.disabled = true;
+        enterBtn.textContent = 'Starting XR…';
+        await scene.startSession();
+        enterBtn.textContent = 'In XR';
+      } catch (e) {
         console.warn('XR session start failed:', e);
-        enterBtn.textContent = 'XR start failed (see console)';
+        enterBtn.disabled = false;
+        const reason = (e && (e.message || String(e))) || 'unknown error';
+        enterBtn.textContent = 'XR start failed';
+        enterBtn.title = reason;
+        const info = document.getElementById('info');
+        if (info) {
+          info.insertAdjacentHTML(
+            'beforeend',
+            `<br><br><span style="color:#c44"><b>XR start failed:</b> ${reason}</span>`,
+          );
+        }
       }
     });
   }

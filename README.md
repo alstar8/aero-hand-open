@@ -10,17 +10,30 @@ CUDA 12 JAX (recommended):
 
 ## MuJoCo RL training
 
-Train the PPO baseline (default env: `AeroCubeRotateZAxis`):
+Train the PPO baseline (default env: `AeroCubeRotateZAxis`, 50mm cube).
+Pass a task name positionally or with `--env_name`:
+
+| Task | Cube |
+|------|------|
+| `AeroCubeRotateZAxis` | 50mm (default) |
+| `AeroCubeRotateZAxis38mm` | 38mm |
 
 ```bash
 ./scripts/train_mujoco_rl_baseline.sh
+./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis38mm
+./scripts/train_mujoco_rl_baseline.sh --env_name AeroCubeRotateZAxis38mm
 ```
+
+Cold starts compile XLA on the CPU (`ptxas`); `nvidia-smi` GPU util often
+stays near 0% until the first `reward=` line, then should sit near 100%.
+Compiles are cached under `~/.cache/jax` so restarts warm up much faster.
 
 Common options:
 
 ```bash
 ./scripts/train_mujoco_rl_baseline.sh --gpu 0
 ./scripts/train_mujoco_rl_baseline.sh --smoke
+./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis38mm --gpu 0
 ./scripts/train_mujoco_rl_baseline.sh --env_name AeroCubeRotateZAxis
 ./scripts/train_mujoco_rl_baseline.sh --suffix my-run
 ./scripts/train_mujoco_rl_baseline.sh --use_tb
@@ -29,12 +42,15 @@ Common options:
 ./scripts/train_mujoco_rl_baseline.sh -- --use_tb --domain_randomization
 ```
 
-Play a checkpoint:
+Play a checkpoint (writes `rollout*.mp4` into the resolved step folder):
 
 ```bash
 ./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path PATH
 ./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path latest
-./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis-20260727-194230-baseline/checkpoints/000066846720
+./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis-20260727-194230-baseline/checkpoints/000300810240
+
+
+./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis-20260727-194230-baseline/checkpoints/000033423360
 ```
 
 ## Real-hand RL inference
@@ -46,6 +62,7 @@ Run a trained `AeroCubeRotateZAxis` policy on the Aero Hand Open. Moves to the s
 # Real hand
 ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint latest --gpu 1 --duration 30
 ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis-20260727-194230-baseline/checkpoints/000066846720 --gpu 0 --duration 30
+./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis-20260727-194230-baseline/checkpoints/000300810240 --gpu 0 --duration 30
 ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint PATH --gpu 1
 ./scripts/infer_aero_hand_rl.sh --cube-pose zed --checkpoint latest --gpu 1
 ./scripts/infer_aero_hand_rl.sh --list-ports
@@ -53,13 +70,23 @@ Run a trained `AeroCubeRotateZAxis` policy on the Aero Hand Open. Moves to the s
 ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint latest --open-on-exit
 ```
 
-## Hand dexterity demo
+## Hand calibration & dexterity demo
 
 Install the SDK (once):
 
 ```bash
 pip install -e sdk
 ```
+
+Calibrate (on-board homing — keep fingers clear; can take a few minutes):
+
+```bash
+./scripts/calibrate_hand.py
+./scripts/calibrate_hand.py --list-ports
+./scripts/calibrate_hand.py --port /dev/ttyACM0
+```
+
+Dexterity demo:
 
 ```bash
 ./scripts/demo_hand_dexterity.py
