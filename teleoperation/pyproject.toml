@@ -1,0 +1,18 @@
+[project]
+name = "aero-hand-teleop"
+version = "0.1.0"
+description = "WebXR (Meta Quest) VR teleoperation for the bare Aero Hand Open -- pinch-gesture finger calibration, then live finger-curl + thumb-abduction streaming to the real hand."
+readme = "README.md"
+requires-python = ">=3.10"
+
+dependencies = [
+    "aiohttp>=3.9",
+    "numpy",
+    "aero-open-sdk",
+]
+
+[tool.uv.sources]
+aero-open-sdk = { path = "../sdk", editable = true }
+
+[tool.uv]
+package = false
