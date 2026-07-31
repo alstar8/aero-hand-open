@@ -15,9 +15,11 @@
 
 """Run a trained AeroCubeRotateZAxis PPO policy on a real Aero Hand Open.
 
-By default runs on-board homing/calibration, moves to the sim home pose, then
-closes the control loop at ctrl_dt. Proprio comes from get_actuations() mapped
-into sim units — matching training's default proprio_source=\"ctrl\".
+By default runs on-board homing/calibration, verifies full open-palm, moves to
+the sim home pose (partial MCP curl by design), then closes the control loop
+at ctrl_dt. Proprio defaults to last commanded ctrl — matching training's
+``proprio_source="ctrl"``. Optional ``--cmd-bias`` nudges real thumb abduction
+toward the index for tip spacing.
 
 Cube pose comes from ``--cube-pose mock`` (hardcoded near the training reset)
 or ``--cube-pose zed`` (stub for now). The policy observes proprio + last
@@ -96,6 +98,14 @@ MOCK_CUBE_QUAT = np.array(
 )
 
 OPEN_PALM_ACTUATION = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+# Added to sim_cmd before mapping to real actuations (and subtracted from
+# actuator-derived proprio). Default pulls thumb toward the index: higher abd
+# closes tip spacing on the real hand (~+0.25 rad ≈ tip_dist −5 mm in sim).
+# Order: [index, middle, ring, pinky, thumb_abd, th1, th2]
+DEFAULT_CMD_BIAS = np.array(
+    [0.0, 0.0, 0.0, 0.0, 0.25, 0.0, 0.0], dtype=np.float32
+)
 
 # Proprio reorder: sim ctrl order -> sensor order (tendons then thumb abd).
 # ctrl: [if, mf, rf, pf, abd, th1, th2] -> obs: [if, mf, rf, pf, th1, th2, abd]
@@ -405,6 +415,35 @@ def parse_args() -> argparse.Namespace:
         default=175.0,
         help="Seconds to wait for homing ACK (default: 175).",
     )
+    parser.add_argument(
+        "--verify-open",
+        type=float,
+        default=1.5,
+        help=(
+            "After homing, hold full open-palm (0°) for this many seconds "
+            "before moving to sim home (default: 1.5). Set 0 to skip. "
+            "Sim home intentionally leaves fingers curled (~80° MCP); that is "
+            "not a failed pinky home."
+        ),
+    )
+    parser.add_argument(
+        "--cmd-bias",
+        default=",".join(str(float(x)) for x in DEFAULT_CMD_BIAS),
+        help=(
+            "Comma-separated 7-float bias added to sim_cmd before mapping "
+            f"(default: {','.join(str(float(x)) for x in DEFAULT_CMD_BIAS)}). "
+            "thumb_abd>+0 brings thumb closer to index on hardware."
+        ),
+    )
+    parser.add_argument(
+        "--proprio-from-actuators",
+        action="store_true",
+        help=(
+            "Build proprio from get_actuations() instead of last commanded "
+            "ctrl (default: commanded ctrl, matching training "
+            "proprio_source=ctrl)."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -451,6 +490,19 @@ def main() -> int:
         checkpoint, seed=args.seed, env_name=args.env_name
     )
 
+    try:
+        cmd_bias = np.asarray(
+            [float(x) for x in str(args.cmd_bias).split(",")],
+            dtype=np.float32,
+        )
+    except ValueError as exc:
+        raise SystemExit(f"invalid --cmd-bias: {exc}") from exc
+    if cmd_bias.shape != (7,):
+        raise SystemExit(
+            f"--cmd-bias must have 7 values, got {cmd_bias.shape[0]}"
+        )
+    print(f"cmd_bias (sim units)={cmd_bias.tolist()}")
+
     hand = None
     if not args.dry_run:
         try:
@@ -476,20 +528,38 @@ def main() -> int:
                 hand.send_homing(timeout_s=args.calibrate_timeout)
             except Exception as exc:
                 raise SystemExit(f"Calibration / homing failed: {exc}") from exc
-            print("Calibration complete.")
+            print("Calibration complete (firmware settle = full extend / open).")
+            if args.verify_open > 0:
+                print(
+                    f"Verifying open-palm (0°) for {args.verify_open:.1f}s — "
+                    "all fingers should be fully relaxed here. If the pinky "
+                    "stays bent at this step, re-home or TRIM channel 6; "
+                    "do not confuse this with the later sim-home curl."
+                )
+                hand.set_actuations(OPEN_PALM_ACTUATION)
+                time.sleep(args.verify_open)
         else:
             print("Skipping calibration (--no-calibrate).")
 
     default_ctrl = DEFAULT_CTRL.copy()
     action_scale = ACTION_SCALE.copy()
-    home_actuation = sim_array_to_actuation_array(default_ctrl)
+    home_ctrl = default_ctrl + cmd_bias
+    home_actuation = sim_array_to_actuation_array(home_ctrl)
     last_action = np.zeros(7, dtype=np.float32)
+    # Policy proprio seed: last commanded sim ctrl (pre-bias), matching training.
+    commanded_sim_ctrl = default_ctrl.copy()
     commanded_actuation = list(home_actuation)
     rng = jax.random.PRNGKey(args.seed)
 
     print(
         f"Moving to sim home ctrl={default_ctrl.tolist()} "
+        f"+ bias -> exec={home_ctrl.tolist()} "
         f"-> actuation(deg)={np.round(home_actuation, 2).tolist()}"
+    )
+    print(
+        "Note: sim home curls MCP joints (~75–82°), not full open. "
+        "Pinky looking ~90° bent at this pose is expected; full open was "
+        "the verify-open / post-homing extend step above."
     )
     if hand is not None:
         hand.set_actuations(home_actuation)
@@ -505,17 +575,24 @@ def main() -> int:
             t0 = time.perf_counter()
             cube_pose = cube_provider.get_pose()
 
-            if hand is not None:
-                read = hand.get_actuations()
-                if read is None:
-                    print("warn: get_actuations failed; using last command")
+            if args.proprio_from_actuators:
+                if hand is not None:
+                    read = hand.get_actuations()
+                    if read is None:
+                        print("warn: get_actuations failed; using last command")
+                        read = commanded_actuation
+                else:
                     read = commanded_actuation
+                sim_proprio = (
+                    np.asarray(
+                        actuation_array_to_sim_array(read), dtype=np.float32
+                    )
+                    - cmd_bias
+                )
             else:
-                read = commanded_actuation
+                # Match training proprio_source=ctrl: commanded motor targets.
+                sim_proprio = commanded_sim_ctrl
 
-            sim_proprio = np.asarray(
-                actuation_array_to_sim_array(read), dtype=np.float32
-            )
             obs = build_obs(sim_proprio, last_action)
             rng, act_rng = jax.random.split(rng)
             action = np.asarray(
@@ -523,7 +600,9 @@ def main() -> int:
             ).ravel()
 
             sim_cmd = default_ctrl + action * action_scale
-            commanded_actuation = sim_array_to_actuation_array(sim_cmd)
+            commanded_sim_ctrl = sim_cmd.astype(np.float32)
+            exec_cmd = sim_cmd + cmd_bias
+            commanded_actuation = sim_array_to_actuation_array(exec_cmd)
             last_action = action
 
             if hand is not None:
@@ -534,7 +613,8 @@ def main() -> int:
                     f"step={step_i:4d} "
                     f"cube={np.round(cube_pose.position, 3).tolist()} "
                     f"action={np.round(action, 3).tolist()} "
-                    f"sim_cmd={np.round(sim_cmd, 4).tolist()}"
+                    f"sim_cmd={np.round(sim_cmd, 4).tolist()} "
+                    f"exec={np.round(exec_cmd, 4).tolist()}"
                 )
 
             elapsed = time.perf_counter() - t0

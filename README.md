@@ -61,11 +61,16 @@ Play a checkpoint (writes `rollout*.mp4` into the resolved step folder):
 ## Real-hand RL inference
 
 Run a trained policy on the Aero Hand Open. By default runs on-board
-homing/calibration first, moves to the sim home pose, then closes the
-control loop. Cube pose: `--cube-pose mock` (hardcoded near training reset)
-or `--cube-pose zed` (stub). Skip calibration with `--no-calibrate`.
+homing/calibration first, briefly holds full open-palm to verify extend,
+moves to the sim home pose (intentionally ~80° MCP curl — not full open),
+then closes the control loop. Default `--cmd-bias` adds thumb abduction so
+thumb/index tip spacing better matches sim on hardware. Cube pose:
+`--cube-pose mock` (hardcoded near training reset) or `--cube-pose zed`
+(stub). Skip calibration with `--no-calibrate`.
 
 ```bash
+
+sudo chmod 666 /dev/ttyACM0
 
 # Real hand
 ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint latest --gpu 1 --duration 30
@@ -76,9 +81,13 @@ or `--cube-pose zed` (stub). Skip calibration with `--no-calibrate`.
 ./scripts/infer_aero_hand_rl.sh --list-ports
 ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint latest --port /dev/ttyACM0
 ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint latest --open-on-exit
+# Stronger thumb–index opposition (abd bias); zero bias disables default:
+./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint PATH \
+  --env_name AeroCubeRotateZAxis38mm --cmd-bias 0,0,0,0,0.35,0,0
+./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint PATH \
+  --env_name AeroCubeRotateZAxis38mm --cmd-bias 0,0,0,0,0,0,0
 
-
-./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis38mm-20260731-113909-baseline/checkpoints/000200540160 --env_name AeroCubeRotateZAxis38mm --gpu 0 --duration 60
+./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis38mm-20260731-132505-baseline/checkpoints/000167116800 --env_name AeroCubeRotateZAxis38mm --gpu 0 --duration 60
 ```
 
 ## Hand calibration & dexterity demo
