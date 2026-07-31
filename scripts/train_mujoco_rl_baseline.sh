@@ -272,15 +272,18 @@ build_train_args() {
     TRAIN_ARGS+=(--suffix baseline)
   fi
 
-  if [[ "${PLAY_ONLY}" -eq 1 ]]; then
-    [[ -n "${LOAD_CHECKPOINT_PATH}" ]] || die \
-      "--play_only requires --load_checkpoint_path (path or 'latest')"
+  if [[ -n "${LOAD_CHECKPOINT_PATH}" ]]; then
     if [[ "${LOAD_CHECKPOINT_PATH}" == "latest" ]]; then
       resolve_latest_checkpoint
     else
       resolve_checkpoint_path
     fi
-    TRAIN_ARGS+=(--play_only --load_checkpoint_path "${LOAD_CHECKPOINT_PATH}")
+    TRAIN_ARGS+=(--load_checkpoint_path "${LOAD_CHECKPOINT_PATH}")
+  fi
+  if [[ "${PLAY_ONLY}" -eq 1 ]]; then
+    [[ -n "${LOAD_CHECKPOINT_PATH}" ]] || die \
+      "--play_only requires --load_checkpoint_path (path or 'latest')"
+    TRAIN_ARGS+=(--play_only)
   fi
 
   if [[ "${SMOKE}" -eq 1 ]]; then

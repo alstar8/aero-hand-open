@@ -113,6 +113,11 @@ _NORMALIZE_OBSERVATIONS = flags.DEFINE_boolean(
     "normalize_observations", True, "Normalize observations"
 )
 _ACTION_REPEAT = flags.DEFINE_integer("action_repeat", 1, "Action repeat")
+_ACTION_SCALE_MULT = flags.DEFINE_float(
+    "action_scale_mult",
+    1.0,
+    "Multiply env action_scale (finger step size). Use 0.5 for half speed.",
+)
 _UNROLL_LENGTH = flags.DEFINE_integer("unroll_length", 10, "Unroll length")
 _NUM_MINIBATCHES = flags.DEFINE_integer(
     "num_minibatches", 8, "Number of minibatches"
@@ -218,6 +223,16 @@ def main(argv):
   # Load environment configuration
   env_cfg = registry.get_default_config(_ENV_NAME.value)
   env_cfg["impl"] = _IMPL.value
+  if _ACTION_SCALE_MULT.present and _ACTION_SCALE_MULT.value != 1.0:
+    if "action_scale" not in env_cfg:
+      raise ValueError(
+          f"--action_scale_mult set but env {_ENV_NAME.value} has no action_scale"
+      )
+    mult = float(_ACTION_SCALE_MULT.value)
+    env_cfg.action_scale = [float(v) * mult for v in env_cfg.action_scale]
+    logging.info(
+        "Scaled action_scale by %s -> %s", mult, list(env_cfg.action_scale)
+    )
 
   ppo_params = get_rl_config(_ENV_NAME.value)
 

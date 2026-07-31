@@ -66,6 +66,9 @@ Play a checkpoint (writes `rollout*.mp4` into the resolved step folder):
 ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis80mm --play_only --load_checkpoint_path sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis80mm-20260731-154555-baseline/checkpoints/000133693440
 
 
+./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis80mm_30slope --play_only --load_checkpoint_path sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis80mm_30slope-20260731-172207-baseline/checkpoints/000300810240
+
+./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis80mm_30slope --play_only --load_checkpoint_path sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis80mm_30slope-20260731-185555-half_action_scale_1b/checkpoints/000173670400
 
 ```
 
