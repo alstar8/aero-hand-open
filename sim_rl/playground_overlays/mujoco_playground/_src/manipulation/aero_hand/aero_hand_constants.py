@@ -21,6 +21,7 @@ from mujoco_playground._src import mjx_env
 ROOT_PATH = mjx_env.ROOT_PATH / "manipulation" / "aero_hand"
 CUBE_XML = ROOT_PATH / "xmls" / "scene_mjx_cube.xml"
 CUBE_38MM_XML = ROOT_PATH / "xmls" / "scene_mjx_cube_38mm.xml"
+CUBE_25MM_XML = ROOT_PATH / "xmls" / "scene_mjx_cube_25mm.xml"
 
 NQ = 16
 NV = 16

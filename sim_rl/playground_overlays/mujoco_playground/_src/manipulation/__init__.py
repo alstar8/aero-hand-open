@@ -42,6 +42,7 @@ _envs = {
     "LeapCubeRotateZAxis": leap_rotate_z.CubeRotateZAxis,
     "AeroCubeRotateZAxis": aero_hand_rotate_z.CubeRotateZAxis,
     "AeroCubeRotateZAxis38mm": aero_hand_rotate_z.CubeRotateZAxis38mm,
+    "AeroCubeRotateZAxis25mm": aero_hand_rotate_z.CubeRotateZAxis25mm,
 }
 
 _cfgs = {
@@ -56,6 +57,7 @@ _cfgs = {
     "LeapCubeRotateZAxis": leap_rotate_z.default_config,
     "AeroCubeRotateZAxis": aero_hand_rotate_z.default_config,
     "AeroCubeRotateZAxis38mm": aero_hand_rotate_z.default_config,
+    "AeroCubeRotateZAxis25mm": aero_hand_rotate_z.default_config,
 }
 
 _randomizer = {
@@ -63,6 +65,7 @@ _randomizer = {
     "LeapCubeReorient": leap_cube_reorient.domain_randomize,
     "AeroCubeRotateZAxis": aero_hand_rotate_z.domain_randomize,
     "AeroCubeRotateZAxis38mm": aero_hand_rotate_z.domain_randomize,
+    "AeroCubeRotateZAxis25mm": aero_hand_rotate_z.domain_randomize,
 }
 
 

@@ -41,5 +41,29 @@ if ! uv --no-config run python -c 'import serial' >/dev/null 2>&1; then
   uv --no-config pip install 'pyserial>=3.5' --index-url https://pypi.org/simple
 fi
 
-log "infer_aero_hand_rl.py $*"
-exec uv --no-config run python "${INFER_PY}" "$@"
+# argparse treats a following token that starts with "-" as another flag, so
+# rewrite "--cmd-bias -0.007,..." into "--cmd-bias=-0.007,...".
+args=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --cmd-bias)
+      if [[ $# -ge 2 && "$2" != --* ]]; then
+        args+=("--cmd-bias=$2")
+        shift 2
+      else
+        die "--cmd-bias requires a value (use --cmd-bias=-0.007,... for negatives)"
+      fi
+      ;;
+    --cmd-bias=*)
+      args+=("$1")
+      shift
+      ;;
+    *)
+      args+=("$1")
+      shift
+      ;;
+  esac
+done
+
+log "infer_aero_hand_rl.py ${args[*]}"
+exec uv --no-config run python "${INFER_PY}" "${args[@]}"

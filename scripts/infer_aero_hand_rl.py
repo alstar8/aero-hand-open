@@ -18,8 +18,8 @@
 By default runs on-board homing/calibration, verifies full open-palm, moves to
 the sim home pose (partial MCP curl by design), then closes the control loop
 at ctrl_dt. Proprio defaults to last commanded ctrl — matching training's
-``proprio_source="ctrl"``. Optional ``--cmd-bias`` nudges real thumb abduction
-toward the index for tip spacing.
+``proprio_source="ctrl"``. Optional ``--cmd-bias`` adds sim-to-real offsets
+(finger curl + thumb abduction) before mapping to hardware.
 
 Cube pose comes from ``--cube-pose mock`` (hardcoded near the training reset)
 or ``--cube-pose zed`` (stub for now). The policy observes proprio + last
@@ -100,11 +100,19 @@ MOCK_CUBE_QUAT = np.array(
 OPEN_PALM_ACTUATION = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
 # Added to sim_cmd before mapping to real actuations (and subtracted from
-# actuator-derived proprio). Default pulls thumb toward the index: higher abd
-# closes tip spacing on the real hand (~+0.25 rad ≈ tip_dist −5 mm in sim).
+# actuator-derived proprio).
+#
+# Measured 2026-07-31 on this hand (actuation sweep + motor current):
+#   load-knee (I≥350mA): index≈54°, middle≈42°, ring≈54°, pinky≈24°
+#   hard-ish stop:       index/middle≈240°, ring≈234°, pinky≈216°
+# Method C bias = map(knee + naive_home_travel) - home_ctrl  →
+#   index≈-0.009, middle≈-0.007, ring≈-0.009, pinky≈-0.004
+# Middle/ring still look ~30° open vs sim at slack-only bias (underactuated
+# PIP/DIP share cable; sim is nearly MCP-only), so add another ≈-0.007
+# (~30° MCP) on those two. Thumb abd +0.25 keeps tip spacing.
 # Order: [index, middle, ring, pinky, thumb_abd, th1, th2]
 DEFAULT_CMD_BIAS = np.array(
-    [0.0, 0.0, 0.0, 0.0, 0.25, 0.0, 0.0], dtype=np.float32
+    [-0.009, -0.014, -0.016, -0.004, 0.25, 0.0, 0.0], dtype=np.float32
 )
 
 # Proprio reorder: sim ctrl order -> sensor order (tendons then thumb abd).
@@ -342,7 +350,8 @@ def parse_args() -> argparse.Namespace:
         default=ENV_NAME,
         help=(
             "Playground env / task name (default: AeroCubeRotateZAxis). "
-            "Use AeroCubeRotateZAxis38mm for the 38mm cube policy."
+            "Use AeroCubeRotateZAxis38mm / AeroCubeRotateZAxis25mm for "
+            "smaller cube policies."
         ),
     )
     parser.add_argument(
@@ -432,6 +441,7 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Comma-separated 7-float bias added to sim_cmd before mapping "
             f"(default: {','.join(str(float(x)) for x in DEFAULT_CMD_BIAS)}). "
+            "Finger tendons: negative shortens cable (more curl). "
             "thumb_abd>+0 brings thumb closer to index on hardware."
         ),
     )
@@ -557,9 +567,10 @@ def main() -> int:
         f"-> actuation(deg)={np.round(home_actuation, 2).tolist()}"
     )
     print(
-        "Note: sim home curls MCP joints (~75–82°), not full open. "
-        "Pinky looking ~90° bent at this pose is expected; full open was "
-        "the verify-open / post-homing extend step above."
+        "Note: sim home curls MCP joints (~74° after settle; keyframe qpos is "
+        "stale). Real fingers need extra tendon pull (default cmd_bias) because "
+        "cable is shared across MCP/PIP/DIP. Pinky looking bent at this pose is "
+        "expected; full open was the verify-open / post-homing extend step above."
     )
     if hand is not None:
         hand.set_actuations(home_actuation)

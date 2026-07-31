@@ -153,7 +153,11 @@ def brax_ppo_config(
         value_obs_key="privileged_state",
     )
     rl_config.num_resets_per_eval = 1
-  elif env_name in ("AeroCubeRotateZAxis", "AeroCubeRotateZAxis38mm"):
+  elif env_name in (
+      "AeroCubeRotateZAxis",
+      "AeroCubeRotateZAxis38mm",
+      "AeroCubeRotateZAxis25mm",
+  ):
     rl_config.num_timesteps = 300_000_000
     rl_config.num_evals = 10
     rl_config.num_minibatches = 32

@@ -339,6 +339,12 @@ class CubeRotateZAxis38mm(CubeRotateZAxis):
   _XML_PATH = consts.CUBE_38MM_XML
 
 
+class CubeRotateZAxis25mm(CubeRotateZAxis):
+  """Same as CubeRotateZAxis but with a 25mm cube (vs default 50mm)."""
+
+  _XML_PATH = consts.CUBE_25MM_XML
+
+
 def domain_randomize(model: mjx.Model, rng: jax.Array):
   mj_model = CubeRotateZAxis().mj_model
   cube_geom_id = mj_model.geom("cube").id
