@@ -173,7 +173,7 @@ def main() -> int:
     parser.add_argument(
         "--env_name",
         default=ENV_NAME,
-        help="Playground env name (e.g. AeroCubeRotateZAxis38mm / AeroCubeRotateZAxis25mm).",
+        help="Playground env name (e.g. AeroCubeRotateZAxis25mm / 38mm / 80mm).",
     )
     parser.add_argument(
         "--real-log",

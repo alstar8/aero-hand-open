@@ -5,7 +5,8 @@ checkout by `scripts/apply_playground_overlays.sh` (also invoked from
 setup + train).
 
 They exist because Aero Hand Open customizations (notably
-`AeroCubeRotateZAxis38mm` / `AeroCubeRotateZAxis25mm`) are not published on
+`AeroCubeRotateZAxis38mm` / `AeroCubeRotateZAxis25mm` /
+`AeroCubeRotateZAxis80mm`) are not published on
 `google-deepmind/mujoco_playground`, so a submodule gitlink alone is not
 fetchable on other machines.
 
@@ -23,6 +24,8 @@ git archive HEAD \
   mujoco_playground/_src/manipulation/aero_hand/xmls/scene_mjx_cube_38mm.xml \
   mujoco_playground/_src/manipulation/aero_hand/xmls/reorientation_cube_25mm.xml \
   mujoco_playground/_src/manipulation/aero_hand/xmls/scene_mjx_cube_25mm.xml \
+  mujoco_playground/_src/manipulation/aero_hand/xmls/reorientation_cube_80mm.xml \
+  mujoco_playground/_src/manipulation/aero_hand/xmls/scene_mjx_cube_80mm.xml \
   mujoco_playground/config/manipulation_params.py \
 | tar -x -C ../playground_overlays
 ```

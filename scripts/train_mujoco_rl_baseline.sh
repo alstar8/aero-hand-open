@@ -6,6 +6,7 @@
 #   ./scripts/train_mujoco_rl_baseline.sh
 #   ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis38mm
 #   ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis25mm
+#   ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis80mm
 #   ./scripts/train_mujoco_rl_baseline.sh --env_name AeroCubeRotateZAxis38mm
 #   ./scripts/train_mujoco_rl_baseline.sh --gpu 1
 #   ./scripts/train_mujoco_rl_baseline.sh --smoke
@@ -53,6 +54,7 @@ Task name (optional positional, or --env_name):
   AeroCubeRotateZAxis       50mm cube (default)
   AeroCubeRotateZAxis38mm   38mm cube
   AeroCubeRotateZAxis25mm   25mm cube
+  AeroCubeRotateZAxis80mm   80mm cube
 
 Options:
   --env_name NAME              Environment / task name (default: AeroCubeRotateZAxis)
@@ -74,6 +76,7 @@ Options:
 Examples:
   ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis38mm --gpu 0
   ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis25mm --gpu 0
+  ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis80mm --gpu 0
   ./scripts/train_mujoco_rl_baseline.sh --env_name AeroCubeRotateZAxis38mm --smoke
 
 GPU_ID=0 may be used instead of --gpu. Any args after -- are forwarded to

@@ -18,6 +18,7 @@ Pass a task name positionally or with `--env_name`:
 | `AeroCubeRotateZAxis` | 50mm (default) |
 | `AeroCubeRotateZAxis38mm` | 38mm |
 | `AeroCubeRotateZAxis25mm` | 25mm |
+| `AeroCubeRotateZAxis80mm` | 80mm |
 
 Training defaults now match real deploy: proprio from commanded ctrl
 (`get_actuations`-style), with domain randomization on (friction / mass /
@@ -27,6 +28,7 @@ actuator gain+zero-drift). Use `--no_domain_randomization` to turn DR off.
 ./scripts/train_mujoco_rl_baseline.sh
 ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis38mm
 ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis25mm
+./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis80mm
 ./scripts/train_mujoco_rl_baseline.sh --env_name AeroCubeRotateZAxis38mm
 ```
 

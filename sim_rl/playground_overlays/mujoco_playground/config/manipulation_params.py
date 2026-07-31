@@ -157,6 +157,7 @@ def brax_ppo_config(
       "AeroCubeRotateZAxis",
       "AeroCubeRotateZAxis38mm",
       "AeroCubeRotateZAxis25mm",
+      "AeroCubeRotateZAxis80mm",
   ):
     rl_config.num_timesteps = 300_000_000
     rl_config.num_evals = 10

@@ -350,8 +350,7 @@ def parse_args() -> argparse.Namespace:
         default=ENV_NAME,
         help=(
             "Playground env / task name (default: AeroCubeRotateZAxis). "
-            "Use AeroCubeRotateZAxis38mm / AeroCubeRotateZAxis25mm for "
-            "smaller cube policies."
+            "Sized cubes: AeroCubeRotateZAxis25mm / 38mm / 80mm."
         ),
     )
     parser.add_argument(
