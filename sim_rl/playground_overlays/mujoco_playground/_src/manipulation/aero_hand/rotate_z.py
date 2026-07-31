@@ -38,11 +38,18 @@ def default_config() -> config_dict.ConfigDict:
       episode_length=500,
       early_termination=True,
       history_len=1,
+      # Match real deploy: proprio from commanded ctrl (≈ get_actuations),
+      # not MuJoCo tendon/joint sensors. Set "sensors" for the old path.
+      proprio_source="ctrl",
       noise_config=config_dict.create(
           level=1.0,
           scales=config_dict.create(
+              # Legacy sensor-mode noise.
               joint_pos=0.05,
               tendon_length=0.005,
+              # Ctrl-mode noise in sensor order [if,mf,rf,pf,th1,th2,abd].
+              # Abd is larger to cover mapping / tracking lag seen on hardware.
+              ctrl_pos=[0.003, 0.003, 0.003, 0.003, 0.002, 0.002, 0.05],
           ),
       ),
       reward_config=config_dict.create(
@@ -57,6 +64,10 @@ def default_config() -> config_dict.ConfigDict:
           ),
       ),
   )
+
+
+# ctrl order [if,mf,rf,pf,abd,th1,th2] -> sensor/obs order [if,mf,rf,pf,th1,th2,abd]
+_CTRL_TO_SENSOR_ORDER = (0, 1, 2, 3, 5, 6, 4)
 
 
 class CubeRotateZAxis(aero_hand_base.AeroHandEnv):
@@ -83,6 +94,10 @@ class CubeRotateZAxis(aero_hand_base.AeroHandEnv):
     self._cube_qids = mjx_env.get_qpos_ids(self.mj_model, ["cube_freejoint"])
     self._floor_geom_id = self._mj_model.geom("floor").id
     self._cube_geom_id = self._mj_model.geom("cube").id
+    self._ctrl_to_sensor = jp.array(_CTRL_TO_SENSOR_ORDER, dtype=jp.int32)
+    self._ctrl_pos_noise_scale = jp.array(
+        self._config.noise_config.scales.ctrl_pos, dtype=jp.float32
+    )
 
     home_key = self._mj_model.keyframe("home")
     self._init_q = jp.array(home_key.qpos)
@@ -178,41 +193,54 @@ class CubeRotateZAxis(aero_hand_base.AeroHandEnv):
 
     info["rng"], noise_rng = jax.random.split(info["rng"])
 
-    # ------- tendon length sensor -------
-    tendon_lengths = jp.zeros(
-        (len(consts.SENSOR_TENDON_NAMES),), dtype=jp.float32
-    )
-    for idx, name in enumerate(consts.SENSOR_TENDON_NAMES):
-      v = mjx_env.get_sensor_data(self.mj_model, data, name)
-      v = jp.ravel(v)[0]
-      tendon_lengths = tendon_lengths.at[idx].set(v)
+    if self._config.proprio_source == "ctrl":
+      # Match real infer/deploy: mapped get_actuations() ≈ commanded ctrl.
+      proprio = info["motor_targets"][self._ctrl_to_sensor]
+      noisy_proprio = (
+          proprio
+          + (2 * jax.random.uniform(noise_rng, shape=proprio.shape) - 1)
+          * self._config.noise_config.level
+          * self._ctrl_pos_noise_scale
+      )
+    else:
+      # Legacy: MuJoCo tendon length + thumb abd joint sensors.
+      tendon_lengths = jp.zeros(
+          (len(consts.SENSOR_TENDON_NAMES),), dtype=jp.float32
+      )
+      for idx, name in enumerate(consts.SENSOR_TENDON_NAMES):
+        v = mjx_env.get_sensor_data(self.mj_model, data, name)
+        v = jp.ravel(v)[0]
+        tendon_lengths = tendon_lengths.at[idx].set(v)
 
-    info["rng"], noise_rng = jax.random.split(info["rng"])
-    noisy_tendon_lengths = (
-        tendon_lengths
-        + (2 * jax.random.uniform(noise_rng, shape=tendon_lengths.shape) - 1)
-        * self._config.noise_config.level
-        * self._config.noise_config.scales.tendon_length
-    )
+      info["rng"], noise_rng = jax.random.split(info["rng"])
+      noisy_tendon_lengths = (
+          tendon_lengths
+          + (2 * jax.random.uniform(noise_rng, shape=tendon_lengths.shape) - 1)
+          * self._config.noise_config.level
+          * self._config.noise_config.scales.tendon_length
+      )
 
-    # ------- joint angle sensor -------
-    joint_angles = jp.zeros((len(consts.SENSOR_JOINT_NAMES),), dtype=jp.float32)
-    for idx, name in enumerate(consts.SENSOR_JOINT_NAMES):
-      v = mjx_env.get_sensor_data(self.mj_model, data, name)
-      v = jp.ravel(v)[0]
-      joint_angles = joint_angles.at[idx].set(v)
+      joint_angles_s = jp.zeros(
+          (len(consts.SENSOR_JOINT_NAMES),), dtype=jp.float32
+      )
+      for idx, name in enumerate(consts.SENSOR_JOINT_NAMES):
+        v = mjx_env.get_sensor_data(self.mj_model, data, name)
+        v = jp.ravel(v)[0]
+        joint_angles_s = joint_angles_s.at[idx].set(v)
 
-    info["rng"], noise_rng = jax.random.split(info["rng"])
-    noisy_joint_angles = (
-        joint_angles
-        + (2 * jax.random.uniform(noise_rng, shape=joint_angles.shape) - 1)
-        * self._config.noise_config.level
-        * self._config.noise_config.scales.joint_pos
-    )
+      info["rng"], noise_rng = jax.random.split(info["rng"])
+      noisy_joint_angles = (
+          joint_angles_s
+          + (2 * jax.random.uniform(noise_rng, shape=joint_angles_s.shape) - 1)
+          * self._config.noise_config.level
+          * self._config.noise_config.scales.joint_pos
+      )
+      noisy_proprio = jp.concatenate(
+          [noisy_tendon_lengths, noisy_joint_angles]
+      )
 
     state = jp.concatenate([
-        noisy_tendon_lengths,
-        noisy_joint_angles,
+        noisy_proprio,
         info["last_act"],
     ])
 
@@ -345,22 +373,23 @@ def domain_randomize(model: mjx.Model, rng: jax.Array):
 
   @jax.vmap
   def rand(rng):
-    # Cube friction: =U(0.1, 0.5).
+    # Cube friction: plastic cube on rubber tips ≈ mid friction with spread.
     rng, key = jax.random.split(rng)
-    cube_friction = jax.random.uniform(key, (1,), minval=0.1, maxval=0.5)
+    cube_friction = jax.random.uniform(key, (1,), minval=0.2, maxval=0.7)
     geom_friction = model.geom_friction.at[
         cube_geom_id : cube_geom_id + 1, 0
     ].set(cube_friction)
 
-    # Fingertip friction: =U(0.5, 1.0).
-    fingertip_friction = jax.random.uniform(key, (1,), minval=0.5, maxval=1.0)
+    # Fingertip friction: =U(0.5, 1.2).
+    rng, key = jax.random.split(rng)
+    fingertip_friction = jax.random.uniform(key, (1,), minval=0.5, maxval=1.2)
     geom_friction = model.geom_friction.at[fingertip_geom_ids, 0].set(
         fingertip_friction
     )
 
-    # Scale cube mass: *U(0.8, 1.2).
+    # Scale cube mass: *U(0.85, 1.2) — covers 38mm/50mm density variation.
     rng, key1, key2 = jax.random.split(rng, 3)
-    dmass = jax.random.uniform(key1, minval=0.8, maxval=1.2)
+    dmass = jax.random.uniform(key1, minval=0.85, maxval=1.2)
     cube_mass = model.body_mass[cube_body_id]
     body_mass = model.body_mass.at[cube_body_id].set(cube_mass * dmass)
     body_inertia = model.body_inertia.at[cube_body_id].set(
@@ -379,17 +408,17 @@ def domain_randomize(model: mjx.Model, rng: jax.Array):
         + jax.random.uniform(key, shape=(16,), minval=-0.05, maxval=0.05)
     )
 
-    # Scale static friction: *U(0.9, 1.1).
+    # Scale static friction: *U(0.5, 2.0).
     rng, key = jax.random.split(rng)
     frictionloss = model.dof_frictionloss[hand_qids] * jax.random.uniform(
         key, shape=(16,), minval=0.5, maxval=2.0
     )
     dof_frictionloss = model.dof_frictionloss.at[hand_qids].set(frictionloss)
 
-    # Scale armature: *U(1.0, 1.05).
+    # Scale armature: *U(1.0, 1.1).
     rng, key = jax.random.split(rng)
     armature = model.dof_armature[hand_qids] * jax.random.uniform(
-        key, shape=(16,), minval=1.0, maxval=1.05
+        key, shape=(16,), minval=1.0, maxval=1.1
     )
     dof_armature = model.dof_armature.at[hand_qids].set(armature)
 
@@ -402,18 +431,24 @@ def domain_randomize(model: mjx.Model, rng: jax.Array):
         model.body_mass[hand_body_ids] * dmass
     )
 
-    # Joint stiffness: *U(0.8, 1.2).
+    # Joint stiffness: wider to mimic servo tracking variation on hardware.
     rng, key = jax.random.split(rng)
     kp = model.actuator_gainprm[:, 0] * jax.random.uniform(
-        key, (model.nu,), minval=0.8, maxval=1.2
+        key, (model.nu,), minval=0.65, maxval=1.35
     )
     actuator_gainprm = model.actuator_gainprm.at[:, 0].set(kp)
     actuator_biasprm = model.actuator_biasprm.at[:, 1].set(-kp)
 
-    # Joint damping: *U(0.8, 1.2).
+    # Post-calibration zero drift on actuators (esp. visible on abd).
+    rng, key = jax.random.split(rng)
+    actuator_biasprm = actuator_biasprm.at[:, 0].add(
+        jax.random.uniform(key, (model.nu,), minval=-0.02, maxval=0.02)
+    )
+
+    # Joint damping: *U(0.7, 1.3).
     rng, key = jax.random.split(rng)
     kd = model.dof_damping[hand_qids] * jax.random.uniform(
-        key, (16,), minval=0.8, maxval=1.2
+        key, (16,), minval=0.7, maxval=1.3
     )
     dof_damping = model.dof_damping.at[hand_qids].set(kd)
 

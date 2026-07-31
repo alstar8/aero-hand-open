@@ -94,10 +94,11 @@ def run_sim_rollout(
     n_steps: int,
     seed: int,
     disable_obs_noise: bool,
+    env_name: str = ENV_NAME,
 ) -> dict[str, np.ndarray]:
     from mujoco_playground import registry
 
-    env = registry.load(ENV_NAME)
+    env = registry.load(env_name)
     if disable_obs_noise:
         env._config.noise_config.level = 0.0
 
@@ -170,11 +171,14 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint", default="latest")
     parser.add_argument(
+        "--env_name",
+        default=ENV_NAME,
+        help="Playground env name (use AeroCubeRotateZAxis38mm for 38mm cube).",
+    )
+    parser.add_argument(
         "--real-log",
-        default=str(
-            Path.home()
-            / ".cursor/projects/home-admin-aero-hand-open/terminals/2.txt"
-        ),
+        required=True,
+        help="Path to a real infer log containing step=... action=... sim_cmd=... lines.",
     )
     parser.add_argument("--steps", type=int, default=500)
     parser.add_argument("--seed", type=int, default=1)
@@ -194,8 +198,9 @@ def main() -> int:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
         os.environ.setdefault("CUDA_DEVICE_ORDER", "PCI_BUS_ID")
 
-    checkpoint = resolve_checkpoint(args.checkpoint)
+    checkpoint = resolve_checkpoint(args.checkpoint, env_name=args.env_name)
     print(f"Checkpoint: {checkpoint}")
+    print(f"Env: {args.env_name}")
     print(f"JAX backend: {jax.default_backend()} devices={jax.devices()}")
 
     real = parse_real_log(Path(args.real_log))
@@ -205,7 +210,9 @@ def main() -> int:
     )
 
     print("\n=== Loading policy (once) ===")
-    jit_inference_fn = load_policy(checkpoint, seed=args.seed)
+    jit_inference_fn = load_policy(
+        checkpoint, seed=args.seed, env_name=args.env_name
+    )
 
     print("\n=== Running sim rollout ===")
     sim = run_sim_rollout(
@@ -213,6 +220,7 @@ def main() -> int:
         n_steps=args.steps,
         seed=args.seed,
         disable_obs_noise=args.disable_obs_noise,
+        env_name=args.env_name,
     )
 
     # Ctrl in actuator order; reorder to obs proprio order for comparison.
@@ -233,8 +241,9 @@ def main() -> int:
     print(f"  max /dim ={np.round(np.max(np.abs(ctrl_vs_sensor), 0), 5).tolist()}")
     print(f"  RMSE overall={np.sqrt(np.mean(ctrl_vs_sensor**2)):.5f}")
     print(
-        "  NOTE: real build_obs feeds mapped get_actuations() as proprio, "
-        "while training uses tendon/joint sensors."
+        "  NOTE: with proprio_source=ctrl (default), sim policy state uses "
+        "commanded ctrl like real get_actuations(); this block still reports "
+        "raw MuJoCo sensor vs ctrl for diagnostics."
     )
 
     print("\n========== ACTION / CMD COMPARE ==========")
@@ -340,8 +349,8 @@ def main() -> int:
         "real used fixed mock cube pose (policy state ignores cube)."
     )
     flags.append(
-        "NOTE: real proprio is get_actuations() (command feedback), "
-        "not physical tendon length; tracking lag feeds OOD states."
+        "NOTE: real proprio is get_actuations() (command feedback); "
+        "training default proprio_source=ctrl matches that."
     )
     for f in flags:
         print(f"  - {f}")

@@ -15,16 +15,18 @@
 
 """Run a trained AeroCubeRotateZAxis PPO policy on a real Aero Hand Open.
 
-Moves the hand to the MuJoCo home tendon pose, then closes a 20 Hz control
-loop matching the sim ``ctrl_dt``. Cube pose comes from ``--cube-pose mock``
-(hardcoded near the training reset) or ``--cube-pose zed`` (stub for now).
+By default runs on-board homing/calibration, moves to the sim home pose, then
+closes the control loop at ctrl_dt. Proprio comes from get_actuations() mapped
+into sim units — matching training's default proprio_source=\"ctrl\".
 
-The current policy observes proprio + last action only (14D ``state``); cube
-pose is logged / reserved for privileged / future policies.
+Cube pose comes from ``--cube-pose mock`` (hardcoded near the training reset)
+or ``--cube-pose zed`` (stub for now). The policy observes proprio + last
+action only (14D ``state``); cube pose is logged for placement guidance.
 
 Usage:
   ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint latest
   ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint PATH --dry-run
+  ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint PATH --no-calibrate
   ./scripts/infer_aero_hand_rl.sh --cube-pose zed --checkpoint latest --gpu 1
 
 Requires the mujoco_playground uv env (setup_mujoco_rl_env.sh) and aero-open-sdk.
@@ -272,7 +274,11 @@ def build_obs(sim_proprio7: np.ndarray, last_action: np.ndarray) -> dict:
     return {"state": np.concatenate([reordered, last_action], axis=0)}
 
 
-def load_policy(checkpoint_step_dir: Path, seed: int = 1):
+def load_policy(
+    checkpoint_step_dir: Path,
+    seed: int = 1,
+    env_name: str = ENV_NAME,
+):
     """Load Orbax PPO params via brax train(num_timesteps=0, restore=...)."""
     import functools
 
@@ -282,8 +288,8 @@ def load_policy(checkpoint_step_dir: Path, seed: int = 1):
     from mujoco_playground import wrapper
     from mujoco_playground.config import manipulation_params
 
-    env = registry.load(ENV_NAME)
-    ppo_params = manipulation_params.brax_ppo_config(ENV_NAME)
+    env = registry.load(env_name)
+    ppo_params = manipulation_params.brax_ppo_config(env_name)
     # ConfigDict has no .pop; copy to a plain dict for brax kwargs.
     training_params = dict(ppo_params)
     network_factory_kwargs = dict(training_params.pop("network_factory", {}))
@@ -320,6 +326,14 @@ def parse_args() -> argparse.Namespace:
         "--checkpoint",
         default="latest",
         help='Orbax step dir, run dir, checkpoints/, or "latest" (default).',
+    )
+    parser.add_argument(
+        "--env_name",
+        default=ENV_NAME,
+        help=(
+            "Playground env / task name (default: AeroCubeRotateZAxis). "
+            "Use AeroCubeRotateZAxis38mm for the 38mm cube policy."
+        ),
     )
     parser.add_argument(
         "--cube-pose",
@@ -376,6 +390,21 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Send open-palm actuations on exit (default: hold last command).",
     )
+    parser.add_argument(
+        "--calibrate",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Run on-board homing/calibration before the policy loop "
+            "(default: on). Use --no-calibrate to skip."
+        ),
+    )
+    parser.add_argument(
+        "--calibrate-timeout",
+        type=float,
+        default=175.0,
+        help="Seconds to wait for homing ACK (default: 175).",
+    )
     return parser.parse_args()
 
 
@@ -402,8 +431,9 @@ def main() -> int:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
         os.environ.setdefault("CUDA_DEVICE_ORDER", "PCI_BUS_ID")
 
-    checkpoint = resolve_checkpoint(args.checkpoint)
+    checkpoint = resolve_checkpoint(args.checkpoint, env_name=args.env_name)
     print(f"Checkpoint: {checkpoint}")
+    print(f"Env: {args.env_name}")
     print(f"JAX backend: {jax.default_backend()} devices={jax.devices()}")
 
     cube_provider = make_cube_provider(args)
@@ -417,7 +447,9 @@ def main() -> int:
         f"{MOCK_CUBE_POS.tolist()} m (sim frame) before the hold ends."
     )
 
-    jit_inference_fn = load_policy(checkpoint, seed=args.seed)
+    jit_inference_fn = load_policy(
+        checkpoint, seed=args.seed, env_name=args.env_name
+    )
 
     hand = None
     if not args.dry_run:
@@ -435,6 +467,18 @@ def main() -> int:
             ) from exc
         hand = AeroHand(port=args.port)
         print(f"Connected hand on {hand.ser.port}")
+        if args.calibrate:
+            print(
+                "Running on-board homing / calibration. "
+                "Keep fingers clear; this can take a few minutes..."
+            )
+            try:
+                hand.send_homing(timeout_s=args.calibrate_timeout)
+            except Exception as exc:
+                raise SystemExit(f"Calibration / homing failed: {exc}") from exc
+            print("Calibration complete.")
+        else:
+            print("Skipping calibration (--no-calibrate).")
 
     default_ctrl = DEFAULT_CTRL.copy()
     action_scale = ACTION_SCALE.copy()

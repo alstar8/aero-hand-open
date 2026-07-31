@@ -9,13 +9,15 @@
 #   ./scripts/train_mujoco_rl_baseline.sh --gpu 1
 #   ./scripts/train_mujoco_rl_baseline.sh --smoke
 #   ./scripts/train_mujoco_rl_baseline.sh --no_tb
-#   ./scripts/train_mujoco_rl_baseline.sh -- --domain_randomization
+#   ./scripts/train_mujoco_rl_baseline.sh --no_domain_randomization
 #   ./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path PATH
 #   ./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path latest
 #
 # Logs / checkpoints land under:
 #   sim_rl/mujoco_playground/logs/<env>-<timestamp>[-suffix]/
 # TensorBoard is on by default (events under that run dir); use --no_tb to disable.
+# Domain randomization is on by default (real-setup-oriented); use
+# --no_domain_randomization to disable.
 
 set -euo pipefail
 
@@ -31,7 +33,7 @@ LOAD_CHECKPOINT_PATH=""
 SMOKE=0
 USE_TB=1
 USE_WANDB=0
-DOMAIN_RANDOMIZATION=0
+DOMAIN_RANDOMIZATION=1
 EXTRA_ARGS=()
 
 usage() {
@@ -41,6 +43,10 @@ Train the MuJoCo Playground PPO baseline for Aero Hand Open.
 Uses the existing uv venv at sim_rl/mujoco_playground/.venv (run
 scripts/setup_mujoco_rl_env.sh first). Default env is AeroCubeRotateZAxis with
 the tuned brax PPO hyperparameters from mujoco_playground.
+
+Proprio defaults to commanded ctrl (matches real get_actuations deploy).
+Domain randomization is on by default (friction/mass/actuator spread tuned
+toward the real hand).
 
 Task name (optional positional, or --env_name):
   AeroCubeRotateZAxis       50mm cube (default)
@@ -59,7 +65,8 @@ Options:
   --use_tb                     Enable TensorBoard logging (default)
   --no_tb                      Disable TensorBoard logging
   --use_wandb                  Enable Weights & Biases logging
-  --domain_randomization       Enable domain randomization
+  --domain_randomization       Enable domain randomization (default)
+  --no_domain_randomization    Disable domain randomization
   -h, --help                   Show this help
 
 Examples:
@@ -112,6 +119,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --domain_randomization)
       DOMAIN_RANDOMIZATION=1
+      shift
+      ;;
+    --no_domain_randomization)
+      DOMAIN_RANDOMIZATION=0
       shift
       ;;
     -h|--help)

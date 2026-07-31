@@ -18,6 +18,10 @@ Pass a task name positionally or with `--env_name`:
 | `AeroCubeRotateZAxis` | 50mm (default) |
 | `AeroCubeRotateZAxis38mm` | 38mm |
 
+Training defaults now match real deploy: proprio from commanded ctrl
+(`get_actuations`-style), with domain randomization on (friction / mass /
+actuator gain+zero-drift). Use `--no_domain_randomization` to turn DR off.
+
 ```bash
 ./scripts/train_mujoco_rl_baseline.sh
 ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis38mm
@@ -40,8 +44,7 @@ Common options:
 ./scripts/train_mujoco_rl_baseline.sh --suffix my-run
 ./scripts/train_mujoco_rl_baseline.sh --no_tb
 ./scripts/train_mujoco_rl_baseline.sh --use_wandb
-./scripts/train_mujoco_rl_baseline.sh --domain_randomization
-./scripts/train_mujoco_rl_baseline.sh -- --domain_randomization
+./scripts/train_mujoco_rl_baseline.sh --no_domain_randomization
 ```
 
 Play a checkpoint (writes `rollout*.mp4` into the resolved step folder):
@@ -57,19 +60,25 @@ Play a checkpoint (writes `rollout*.mp4` into the resolved step folder):
 
 ## Real-hand RL inference
 
-Run a trained `AeroCubeRotateZAxis` policy on the Aero Hand Open. Moves to the sim home pose, then closes the control loop. Cube pose: `--cube-pose mock` (hardcoded near training reset) or `--cube-pose zed` (stub).
+Run a trained policy on the Aero Hand Open. By default runs on-board
+homing/calibration first, moves to the sim home pose, then closes the
+control loop. Cube pose: `--cube-pose mock` (hardcoded near training reset)
+or `--cube-pose zed` (stub). Skip calibration with `--no-calibrate`.
 
 ```bash
 
 # Real hand
 ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint latest --gpu 1 --duration 30
-./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis-20260727-194230-baseline/checkpoints/000066846720 --gpu 0 --duration 30
-./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis-20260727-194230-baseline/checkpoints/000300810240 --gpu 0 --duration 30
 ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint PATH --gpu 1
+./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint PATH --env_name AeroCubeRotateZAxis38mm --gpu 0 --duration 60
+./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint PATH --no-calibrate
 ./scripts/infer_aero_hand_rl.sh --cube-pose zed --checkpoint latest --gpu 1
 ./scripts/infer_aero_hand_rl.sh --list-ports
 ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint latest --port /dev/ttyACM0
 ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint latest --open-on-exit
+
+
+./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis38mm-20260731-113909-baseline/checkpoints/000200540160 --env_name AeroCubeRotateZAxis38mm --gpu 0 --duration 60
 ```
 
 ## Hand calibration & dexterity demo
