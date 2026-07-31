@@ -8,12 +8,14 @@
 #   ./scripts/train_mujoco_rl_baseline.sh --env_name AeroCubeRotateZAxis38mm
 #   ./scripts/train_mujoco_rl_baseline.sh --gpu 1
 #   ./scripts/train_mujoco_rl_baseline.sh --smoke
-#   ./scripts/train_mujoco_rl_baseline.sh -- --use_tb --domain_randomization
+#   ./scripts/train_mujoco_rl_baseline.sh --no_tb
+#   ./scripts/train_mujoco_rl_baseline.sh -- --domain_randomization
 #   ./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path PATH
 #   ./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path latest
 #
 # Logs / checkpoints land under:
 #   sim_rl/mujoco_playground/logs/<env>-<timestamp>[-suffix]/
+# TensorBoard is on by default (events under that run dir); use --no_tb to disable.
 
 set -euo pipefail
 
@@ -27,7 +29,7 @@ SUFFIX=""
 PLAY_ONLY=0
 LOAD_CHECKPOINT_PATH=""
 SMOKE=0
-USE_TB=0
+USE_TB=1
 USE_WANDB=0
 DOMAIN_RANDOMIZATION=0
 EXTRA_ARGS=()
@@ -54,7 +56,8 @@ Options:
   --load_checkpoint_path PATH  Checkpoint dir/file (required with --play_only).
                                Use "latest" to pick the newest run under
                                logs/<env_name>-*/checkpoints for --env_name.
-  --use_tb                     Enable TensorBoard logging
+  --use_tb                     Enable TensorBoard logging (default)
+  --no_tb                      Disable TensorBoard logging
   --use_wandb                  Enable Weights & Biases logging
   --domain_randomization       Enable domain randomization
   -h, --help                   Show this help
@@ -97,6 +100,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --use_tb)
       USE_TB=1
+      shift
+      ;;
+    --no_tb)
+      USE_TB=0
       shift
       ;;
     --use_wandb)

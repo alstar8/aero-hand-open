@@ -27,6 +27,8 @@ Pass a task name positionally or with `--env_name`:
 Cold starts compile XLA on the CPU (`ptxas`); `nvidia-smi` GPU util often
 stays near 0% until the first `reward=` line, then should sit near 100%.
 Compiles are cached under `~/.cache/jax` so restarts warm up much faster.
+TensorBoard logging is on by default (events under the run dir); pass
+`--no_tb` to disable.
 
 Common options:
 
@@ -36,10 +38,10 @@ Common options:
 ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis38mm --gpu 0
 ./scripts/train_mujoco_rl_baseline.sh --env_name AeroCubeRotateZAxis
 ./scripts/train_mujoco_rl_baseline.sh --suffix my-run
-./scripts/train_mujoco_rl_baseline.sh --use_tb
+./scripts/train_mujoco_rl_baseline.sh --no_tb
 ./scripts/train_mujoco_rl_baseline.sh --use_wandb
 ./scripts/train_mujoco_rl_baseline.sh --domain_randomization
-./scripts/train_mujoco_rl_baseline.sh -- --use_tb --domain_randomization
+./scripts/train_mujoco_rl_baseline.sh -- --domain_randomization
 ```
 
 Play a checkpoint (writes `rollout*.mp4` into the resolved step folder):
