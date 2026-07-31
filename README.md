@@ -50,9 +50,9 @@ Play a checkpoint (writes `rollout*.mp4` into the resolved step folder):
 ./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path PATH
 ./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path latest
 ./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis-20260727-194230-baseline/checkpoints/000300810240
+./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis38mm --play_only --load_checkpoint_path sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis38mm-20260731-113909-baseline/checkpoints/000133693440
 
 
-./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis-20260727-194230-baseline/checkpoints/000033423360
 ```
 
 ## Real-hand RL inference
