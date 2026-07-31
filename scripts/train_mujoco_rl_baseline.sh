@@ -152,6 +152,9 @@ require_env() {
     "uv venv missing at ${VENV_DIR}; run scripts/setup_mujoco_rl_env.sh"
   [[ -f "${TRAIN_SCRIPT}" ]] || die "training script not found: ${TRAIN_SCRIPT}"
   command -v uv >/dev/null 2>&1 || die "uv not found on PATH"
+  # Ensure 38mm env + train helpers exist even if submodule is a stock
+  # deepmind checkout (overlays are part of this repo, not the submodule).
+  "${SCRIPT_DIR}/apply_playground_overlays.sh"
 }
 
 # Resolve --load_checkpoint_path latest to the newest checkpointed run for ENV_NAME.

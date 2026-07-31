@@ -294,6 +294,7 @@ Activate the environment:
 
 Train the Aero Hand cube Z-rotation baseline (preferred):
   ${REPO_ROOT}/scripts/train_mujoco_rl_baseline.sh --gpu 0
+  ${REPO_ROOT}/scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis38mm --gpu 0
 
 Or manually:
   cd ${PLAYGROUND_DIR}
@@ -306,6 +307,9 @@ EOF
 main() {
   ensure_uv
   ensure_submodule
+  # Aero Hand Open bits (38mm cube env, train helpers) live in-repo overlays
+  # because they are not published on google-deepmind/mujoco_playground.
+  "${SCRIPT_DIR}/apply_playground_overlays.sh"
   setup_venv
   print_next_steps
 }
