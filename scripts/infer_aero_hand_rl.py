@@ -29,6 +29,7 @@ Usage:
   ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint latest
   ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint PATH --dry-run
   ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint PATH --no-calibrate
+  ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint PATH --vel 0.1
   ./scripts/infer_aero_hand_rl.sh --cube-pose zed --checkpoint latest --gpu 1
 
 Requires the mujoco_playground uv env (setup_mujoco_rl_env.sh) and aero-open-sdk.
@@ -102,17 +103,12 @@ OPEN_PALM_ACTUATION = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 # Added to sim_cmd before mapping to real actuations (and subtracted from
 # actuator-derived proprio).
 #
-# Measured 2026-07-31 on this hand (actuation sweep + motor current):
-#   load-knee (I≥350mA): index≈54°, middle≈42°, ring≈54°, pinky≈24°
-#   hard-ish stop:       index/middle≈240°, ring≈234°, pinky≈216°
-# Method C bias = map(knee + naive_home_travel) - home_ctrl  →
-#   index≈-0.009, middle≈-0.007, ring≈-0.009, pinky≈-0.004
-# Middle/ring still look ~30° open vs sim at slack-only bias (underactuated
-# PIP/DIP share cable; sim is nearly MCP-only), so add another ≈-0.007
-# (~30° MCP) on those two. Thumb abd +0.25 keeps tip spacing.
+# Index slack/coupling is handled by a measured real MCP→motor calibration in
+# sim_to_real_mappings. Remaining bias is thumb tip spacing only; middle/ring
+# keep a small extra curl for underactuated lag.
 # Order: [index, middle, ring, pinky, thumb_abd, th1, th2]
 DEFAULT_CMD_BIAS = np.array(
-    [-0.009, -0.014, -0.016, -0.004, 0.25, 0.0, 0.0], dtype=np.float32
+    [0.0, -0.007, -0.007, 0.0, 0.25, 0.0, 0.0], dtype=np.float32
 )
 
 # Proprio reorder: sim ctrl order -> sensor order (tendons then thumb abd).
@@ -395,7 +391,18 @@ def parse_args() -> argparse.Namespace:
         "--dt",
         type=float,
         default=CTRL_DT,
-        help=f"Control period seconds (default: {CTRL_DT}).",
+        help=f"Policy control period seconds (default: {CTRL_DT}).",
+    )
+    parser.add_argument(
+        "--vel",
+        type=float,
+        default=1.0,
+        help=(
+            "Wall-clock time scale for the policy loop (default: 1.0). "
+            "Use --vel 0.1 to run at 0.1x speed (10x slower), giving fingers "
+            "more time to reach each pose. Step count still uses --duration/--dt; "
+            "wall period is dt/vel."
+        ),
     )
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument(
@@ -567,8 +574,9 @@ def main() -> int:
     )
     print(
         "Note: sim home curls MCP joints (~74° after settle; keyframe qpos is "
-        "stale). Real fingers need extra tendon pull (default cmd_bias) because "
-        "cable is shared across MCP/PIP/DIP. Pinky looking bent at this pose is "
+        "stale). Index uses measured real-hand slack + MCP calibration so its "
+        "policy band matches sim (~17–39° MCP). Default cmd_bias is middle/ring "
+        "coupling + thumb tip spacing. Pinky looking bent at this pose is "
         "expected; full open was the verify-open / post-homing extend step above."
     )
     if hand is not None:
@@ -576,9 +584,16 @@ def main() -> int:
     print(f"Holding home for {args.start_hold:.1f}s (place cube now)...")
     time.sleep(args.start_hold)
 
+    if args.vel <= 0:
+        raise SystemExit(f"--vel must be > 0, got {args.vel}")
+    # Policy step count from sim-time duration; wall period stretched by 1/vel.
     n_steps = max(1, int(args.duration / args.dt))
+    wall_dt = args.dt / args.vel
+    wall_duration = args.duration / args.vel
     print(
-        f"Running policy for {args.duration:.1f}s ({n_steps} steps @ {args.dt}s)"
+        f"Running policy for {args.duration:.1f}s policy-time "
+        f"({n_steps} steps @ dt={args.dt}s, vel={args.vel:g} → "
+        f"wall {wall_dt:.3f}s/step, ~{wall_duration:.1f}s wall-clock)"
     )
     try:
         for step_i in range(n_steps):
@@ -624,11 +639,12 @@ def main() -> int:
                     f"cube={np.round(cube_pose.position, 3).tolist()} "
                     f"action={np.round(action, 3).tolist()} "
                     f"sim_cmd={np.round(sim_cmd, 4).tolist()} "
-                    f"exec={np.round(exec_cmd, 4).tolist()}"
+                    f"exec={np.round(exec_cmd, 4).tolist()} "
+                    f"act={np.round(commanded_actuation, 1).tolist()}"
                 )
 
             elapsed = time.perf_counter() - t0
-            sleep_s = args.dt - elapsed
+            sleep_s = wall_dt - elapsed
             if sleep_s > 0:
                 time.sleep(sleep_s)
     except KeyboardInterrupt:

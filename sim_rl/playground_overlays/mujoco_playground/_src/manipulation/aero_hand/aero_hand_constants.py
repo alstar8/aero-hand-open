@@ -23,6 +23,7 @@ CUBE_XML = ROOT_PATH / "xmls" / "scene_mjx_cube.xml"
 CUBE_38MM_XML = ROOT_PATH / "xmls" / "scene_mjx_cube_38mm.xml"
 CUBE_25MM_XML = ROOT_PATH / "xmls" / "scene_mjx_cube_25mm.xml"
 CUBE_80MM_XML = ROOT_PATH / "xmls" / "scene_mjx_cube_80mm.xml"
+CUBE_80MM_30SLOPE_XML = ROOT_PATH / "xmls" / "scene_mjx_cube_80mm_30slope.xml"
 
 NQ = 16
 NV = 16

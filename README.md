@@ -15,10 +15,11 @@ Pass a task name positionally or with `--env_name`:
 
 | Task | Cube |
 |------|------|
-| `AeroCubeRotateZAxis` | 50mm (default) |
+| `AeroCubeRotateZAxis` | 50mm (default), palm ~20° tip-down |
 | `AeroCubeRotateZAxis38mm` | 38mm |
 | `AeroCubeRotateZAxis25mm` | 25mm |
 | `AeroCubeRotateZAxis80mm` | 80mm |
+| `AeroCubeRotateZAxis80mm_30slope` | 80mm, palm 30° tip-down |
 
 Training defaults now match real deploy: proprio from commanded ctrl
 (`get_actuations`-style), with domain randomization on (friction / mass /
@@ -29,6 +30,7 @@ actuator gain+zero-drift). Use `--no_domain_randomization` to turn DR off.
 ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis38mm
 ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis25mm
 ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis80mm
+./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis80mm_30slope
 ./scripts/train_mujoco_rl_baseline.sh --env_name AeroCubeRotateZAxis38mm
 ```
 
@@ -56,8 +58,13 @@ Play a checkpoint (writes `rollout*.mp4` into the resolved step folder):
 ```bash
 ./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path PATH
 ./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path latest
+
 ./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis-20260727-194230-baseline/checkpoints/000300810240
+
 ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis38mm --play_only --load_checkpoint_path sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis38mm-20260731-132505-baseline/checkpoints/000167116800
+
+./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis80mm --play_only --load_checkpoint_path sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis80mm-20260731-154555-baseline/checkpoints/000133693440
+
 
 
 ```
@@ -67,9 +74,10 @@ Play a checkpoint (writes `rollout*.mp4` into the resolved step folder):
 Run a trained policy on the Aero Hand Open. By default runs on-board
 homing/calibration first, briefly holds full open-palm to verify extend,
 moves to the sim home pose (intentionally ~80° MCP curl — not full open),
-then closes the control loop. Default `--cmd-bias` is from a real-hand
-current sweep on this unit (slack knee + middle/ring coupling margin):
-`-0.009,-0.014,-0.016,-0.004,0.25,0,0`. Cube pose:
+then closes the control loop. The index sim↔motor map includes measured
+real-hand cable take-up and MCP calibration so its policy motion matches sim.
+Default `--cmd-bias` is middle/ring coupling + thumb tip spacing:
+`0,-0.007,-0.007,0,0.25,0,0`. Cube pose:
 `--cube-pose mock` (hardcoded near training reset) or `--cube-pose zed`
 (stub). Skip calibration with `--no-calibrate`.
 
@@ -88,11 +96,17 @@ sudo chmod 666 /dev/ttyACM0
 ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint latest --open-on-exit
 # Override bias if needed (use --cmd-bias=... so leading "-" is not a flag):
 ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint PATH \
-  --env_name AeroCubeRotateZAxis38mm --cmd-bias=-0.009,-0.014,-0.016,-0.004,0.35,0,0
+  --env_name AeroCubeRotateZAxis38mm --cmd-bias=0,-0.007,-0.007,0,0.35,0,0
 ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint PATH \
   --env_name AeroCubeRotateZAxis38mm --cmd-bias=0,0,0,0,0,0,0
 
+
+./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis-20260727-194230-baseline/checkpoints/000300810240  --env_name AeroCubeRotateZAxis --gpu 0 --duration 60 --cmd-bias=0,0,0,0,0,0,0
+
 ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis38mm-20260731-132505-baseline/checkpoints/000167116800 --env_name AeroCubeRotateZAxis38mm --gpu 0 --duration 60
+
+./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis80mm-20260731-154555-baseline/checkpoints/000133693440 --env_name AeroCubeRotateZAxis80mm --gpu 0 --duration 60
+
 ```
 
 ## Hand calibration & dexterity demo

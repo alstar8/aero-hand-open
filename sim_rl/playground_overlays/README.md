@@ -6,7 +6,8 @@ setup + train).
 
 They exist because Aero Hand Open customizations (notably
 `AeroCubeRotateZAxis38mm` / `AeroCubeRotateZAxis25mm` /
-`AeroCubeRotateZAxis80mm`) are not published on
+`AeroCubeRotateZAxis80mm` / `AeroCubeRotateZAxis80mm_30slope`) are not
+published on
 `google-deepmind/mujoco_playground`, so a submodule gitlink alone is not
 fetchable on other machines.
 

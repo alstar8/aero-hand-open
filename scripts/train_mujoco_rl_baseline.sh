@@ -7,6 +7,7 @@
 #   ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis38mm
 #   ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis25mm
 #   ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis80mm
+#   ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis80mm_30slope
 #   ./scripts/train_mujoco_rl_baseline.sh --env_name AeroCubeRotateZAxis38mm
 #   ./scripts/train_mujoco_rl_baseline.sh --gpu 1
 #   ./scripts/train_mujoco_rl_baseline.sh --smoke
@@ -51,10 +52,11 @@ Domain randomization is on by default (friction/mass/actuator spread tuned
 toward the real hand).
 
 Task name (optional positional, or --env_name):
-  AeroCubeRotateZAxis       50mm cube (default)
+  AeroCubeRotateZAxis       50mm cube (default), palm ~20° tip-down
   AeroCubeRotateZAxis38mm   38mm cube
   AeroCubeRotateZAxis25mm   25mm cube
   AeroCubeRotateZAxis80mm   80mm cube
+  AeroCubeRotateZAxis80mm_30slope  80mm cube, palm 30° tip-down
 
 Options:
   --env_name NAME              Environment / task name (default: AeroCubeRotateZAxis)

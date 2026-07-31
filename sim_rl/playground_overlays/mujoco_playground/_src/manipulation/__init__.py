@@ -44,6 +44,7 @@ _envs = {
     "AeroCubeRotateZAxis38mm": aero_hand_rotate_z.CubeRotateZAxis38mm,
     "AeroCubeRotateZAxis25mm": aero_hand_rotate_z.CubeRotateZAxis25mm,
     "AeroCubeRotateZAxis80mm": aero_hand_rotate_z.CubeRotateZAxis80mm,
+    "AeroCubeRotateZAxis80mm_30slope": aero_hand_rotate_z.CubeRotateZAxis80mm_30slope,
 }
 
 _cfgs = {
@@ -60,6 +61,7 @@ _cfgs = {
     "AeroCubeRotateZAxis38mm": aero_hand_rotate_z.default_config,
     "AeroCubeRotateZAxis25mm": aero_hand_rotate_z.default_config,
     "AeroCubeRotateZAxis80mm": aero_hand_rotate_z.default_config,
+    "AeroCubeRotateZAxis80mm_30slope": aero_hand_rotate_z.default_config,
 }
 
 _randomizer = {
@@ -69,6 +71,7 @@ _randomizer = {
     "AeroCubeRotateZAxis38mm": aero_hand_rotate_z.domain_randomize,
     "AeroCubeRotateZAxis25mm": aero_hand_rotate_z.domain_randomize,
     "AeroCubeRotateZAxis80mm": aero_hand_rotate_z.domain_randomize,
+    "AeroCubeRotateZAxis80mm_30slope": aero_hand_rotate_z.domain_randomize,
 }
 
 

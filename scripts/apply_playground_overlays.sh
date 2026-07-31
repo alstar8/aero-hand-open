@@ -31,7 +31,7 @@ while IFS= read -r -d '' src; do
 done < <(find "${OVERLAY_DIR}" -type f -print0)
 
 # Quick sanity: sized cube envs must be registered after overlay.
-for _env in AeroCubeRotateZAxis38mm AeroCubeRotateZAxis25mm AeroCubeRotateZAxis80mm; do
+for _env in AeroCubeRotateZAxis38mm AeroCubeRotateZAxis25mm AeroCubeRotateZAxis80mm AeroCubeRotateZAxis80mm_30slope; do
   if ! grep -q "${_env}" \
     "${PLAYGROUND_DIR}/mujoco_playground/_src/manipulation/__init__.py"; then
     die "overlay apply failed: ${_env} not registered"

@@ -351,6 +351,12 @@ class CubeRotateZAxis80mm(CubeRotateZAxis):
   _XML_PATH = consts.CUBE_80MM_XML
 
 
+class CubeRotateZAxis80mm_30slope(CubeRotateZAxis):
+  """80mm cube with palm tipped 30° down (default scenes use ~20°)."""
+
+  _XML_PATH = consts.CUBE_80MM_30SLOPE_XML
+
+
 def domain_randomize(model: mjx.Model, rng: jax.Array):
   mj_model = CubeRotateZAxis().mj_model
   cube_geom_id = mj_model.geom("cube").id
