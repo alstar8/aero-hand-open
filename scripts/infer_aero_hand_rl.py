@@ -38,6 +38,7 @@ Requires the mujoco_playground uv env (setup_mujoco_rl_env.sh) and aero-open-sdk
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 import time
@@ -84,7 +85,9 @@ DEFAULT_CTRL = np.array(
     [0.09, 0.09, 0.09, 0.09, 0.75, 0.035, 0.1], dtype=np.float32
 )
 
-# rotate_z.default_config().action_scale (matches training env)
+# Fallback if checkpoint config.json is missing (rotate_z.default_config).
+# Prefer checkpoints/config.json written at train time — half_action_scale
+# runs store [0.01, 0.01, 0.01, 0.01, 0.35, 0.0015, 0.006].
 ACTION_SCALE = np.array(
     [0.02, 0.02, 0.02, 0.02, 0.7, 0.003, 0.012], dtype=np.float32
 )
@@ -276,6 +279,70 @@ def _latest_step_dir(ckpt_root: Path) -> Path:
     return steps[-1]
 
 
+def find_checkpoint_config(checkpoint_step_dir: Path) -> Optional[Path]:
+    """Locate train-time env config.json next to an Orbax step dir."""
+    # Usual layout: logs/<run>/checkpoints/{config.json, 000123/...}
+    candidates = [
+        checkpoint_step_dir.parent / "config.json",
+        checkpoint_step_dir / "config.json",
+    ]
+    if checkpoint_step_dir.parent.name == "checkpoints":
+        candidates.append(checkpoint_step_dir.parent.parent / "config.json")
+    for path in candidates:
+        if path.is_file():
+            return path
+    return None
+
+
+def load_action_scale(
+    checkpoint_step_dir: Path,
+    env_name: str,
+    action_scale_mult: Optional[float] = None,
+) -> np.ndarray:
+    """Load action_scale from checkpoint config, else env default.
+
+    Training with ``--action_scale_mult 0.5`` writes the scaled vector into
+    ``checkpoints/config.json``. Deploy must use that same scale or motor
+    targets are 2x too large and the policy fixed-point looks wrong on hardware.
+    """
+    cfg_path = find_checkpoint_config(checkpoint_step_dir)
+    scale: Optional[np.ndarray] = None
+    source = "hardcoded fallback"
+
+    if cfg_path is not None:
+        with open(cfg_path, encoding="utf-8") as fp:
+            env_cfg = json.load(fp)
+        if "action_scale" in env_cfg:
+            scale = np.asarray(env_cfg["action_scale"], dtype=np.float32)
+            source = str(cfg_path)
+
+    if scale is None:
+        try:
+            from mujoco_playground import registry
+
+            env_cfg = registry.get_default_config(env_name)
+            if "action_scale" in env_cfg:
+                scale = np.asarray(env_cfg.action_scale, dtype=np.float32)
+                source = f"registry default ({env_name})"
+        except Exception as exc:  # noqa: BLE001 — fall back below
+            print(f"warn: could not load env action_scale from registry: {exc}")
+
+    if scale is None:
+        scale = ACTION_SCALE.copy()
+
+    if scale.shape != (7,):
+        raise SystemExit(
+            f"action_scale must have 7 values, got shape {scale.shape} from {source}"
+        )
+
+    if action_scale_mult is not None:
+        scale = scale * float(action_scale_mult)
+        source = f"{source} * --action-scale-mult={action_scale_mult}"
+
+    print(f"action_scale ({source})={scale.tolist()}")
+    return scale.astype(np.float32)
+
+
 def build_obs(sim_proprio7: np.ndarray, last_action: np.ndarray) -> dict:
     """Match deploy / rotate_z policy ``state`` (14D)."""
     proprio = np.asarray(sim_proprio7, dtype=np.float32).ravel()
@@ -460,6 +527,17 @@ def parse_args() -> argparse.Namespace:
             "proprio_source=ctrl)."
         ),
     )
+    parser.add_argument(
+        "--action-scale-mult",
+        type=float,
+        default=None,
+        help=(
+            "Optional extra multiplier on the loaded action_scale. Prefer "
+            "relying on checkpoints/config.json (written at train time). "
+            "Only use this if config.json is missing and you trained with "
+            "--action_scale_mult (e.g. 0.5)."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -558,7 +636,11 @@ def main() -> int:
             print("Skipping calibration (--no-calibrate).")
 
     default_ctrl = DEFAULT_CTRL.copy()
-    action_scale = ACTION_SCALE.copy()
+    action_scale = load_action_scale(
+        checkpoint,
+        env_name=args.env_name,
+        action_scale_mult=args.action_scale_mult,
+    )
     home_ctrl = default_ctrl + cmd_bias
     home_actuation = sim_array_to_actuation_array(home_ctrl)
     last_action = np.zeros(7, dtype=np.float32)

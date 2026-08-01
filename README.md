@@ -59,18 +59,30 @@ Play a checkpoint (writes `rollout*.mp4` into the resolved step folder):
 ./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path PATH
 ./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path latest
 
-./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis-20260727-194230-baseline/checkpoints/000300810240
-
-./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis38mm --play_only --load_checkpoint_path sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis38mm-20260731-132505-baseline/checkpoints/000167116800
+./scripts/train_mujoco_rl_baseline.sh --play_only --load_checkpoint_path sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis-20260727-194230-baseline/checkpoints/000066846720
 
 ./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis80mm --play_only --load_checkpoint_path sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis80mm-20260731-154555-baseline/checkpoints/000133693440
 
-
-./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis80mm_30slope --play_only --load_checkpoint_path sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis80mm_30slope-20260731-172207-baseline/checkpoints/000300810240
-
-./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis80mm_30slope --play_only --load_checkpoint_path sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis80mm_30slope-20260731-185555-half_action_scale_1b/checkpoints/000173670400
-
+./scripts/train_mujoco_rl_baseline.sh AeroCubeRotateZAxis80mm_30slope --play_only --load_checkpoint_path sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis80mm_30slope-20260731-185555-half_action_scale_1b/checkpoints/001007288320
 ```
+
+### Training reward (`eval/episode_reward`)
+
+![Aero cube rotate-Z training reward comparison](./assets/rl_train_reward_compare.png)
+
+**`AeroCubeRotateZAxis38mm`** (`...38mm-20260731-113909-baseline`)
+
+![38mm train reward](./assets/rl_train_reward_38mm.png)
+
+**`AeroCubeRotateZAxis80mm`** (`...80mm-20260731-154555-baseline`)
+
+![80mm train reward](./assets/rl_train_reward_80mm.png)
+
+**`AeroCubeRotateZAxis80mm_30slope`** (`...80mm_30slope-20260731-185555-half_action_scale_1b`)
+
+![80mm 30deg slope train reward](./assets/rl_train_reward_80mm_30slope.png)
+
+`AeroCubeRotateZAxis` (`...20260727-194230-baseline`) has no local TensorBoard events, so no curve is available. The 80mm 30deg slope plot covers logged evals through ~556M steps (later checkpoint `001007288320` is beyond the last TB point).
 
 ## Real-hand RL inference
 
@@ -91,7 +103,6 @@ sudo chmod 666 /dev/ttyACM0
 # Real hand
 ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint latest --gpu 1 --duration 30
 ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint PATH --gpu 1
-./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint PATH --env_name AeroCubeRotateZAxis38mm --gpu 0 --duration 60
 ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint PATH --no-calibrate
 ./scripts/infer_aero_hand_rl.sh --cube-pose zed --checkpoint latest --gpu 1
 ./scripts/infer_aero_hand_rl.sh --list-ports
@@ -104,12 +115,11 @@ sudo chmod 666 /dev/ttyACM0
   --env_name AeroCubeRotateZAxis38mm --cmd-bias=0,0,0,0,0,0,0
 
 
-./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis-20260727-194230-baseline/checkpoints/000300810240  --env_name AeroCubeRotateZAxis --gpu 0 --duration 60 --cmd-bias=0,0,0,0,0,0,0
-
-./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis38mm-20260731-132505-baseline/checkpoints/000167116800 --env_name AeroCubeRotateZAxis38mm --gpu 0 --duration 60
+./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis-20260727-194230-baseline/checkpoints/000066846720  --env_name AeroCubeRotateZAxis --gpu 0 --duration 60 --cmd-bias=0,0,0,0,0,0,0 --vel 0.2
 
 ./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis80mm-20260731-154555-baseline/checkpoints/000133693440 --env_name AeroCubeRotateZAxis80mm --gpu 0 --duration 60
 
+./scripts/infer_aero_hand_rl.sh --cube-pose mock --checkpoint sim_rl/mujoco_playground/logs/AeroCubeRotateZAxis80mm_30slope-20260731-185555-half_action_scale_1b/checkpoints/001007288320 --env_name AeroCubeRotateZAxis80mm_30slope --gpu 0 --duration 60
 ```
 
 ## Hand calibration & dexterity demo
@@ -160,4 +170,3 @@ uv run python -m server --cert certs/cert.pem --key certs/key.pem
 Open `https://<your-LAN-ip>:8000` in the Quest browser. Pinch left thumb
 + index to advance the 6-step finger calibration; once it completes, the
 tracked right hand drives the real hand directly.
-
