@@ -70,23 +70,7 @@ Play a checkpoint (writes `rollout*.mp4` into the resolved step folder):
 
 ![Aero cube rotate-Z training reward comparison](./assets/rl_train_reward_compare.png)
 
-**`AeroCubeRotateZAxis`** (`...20260801-122434-baseline`)
-
-![50mm train reward](./assets/rl_train_reward_50mm.png)
-
-**`AeroCubeRotateZAxis38mm`** (`...38mm-20260731-113909-baseline`)
-
-![38mm train reward](./assets/rl_train_reward_38mm.png)
-
-**`AeroCubeRotateZAxis80mm`** (`...80mm-20260801-123345-baseline`)
-
-![80mm train reward](./assets/rl_train_reward_80mm.png)
-
-**`AeroCubeRotateZAxis80mm_30slope`** (`...80mm_30slope-20260731-185555-half_action_scale_1b`)
-
-![80mm 30deg slope train reward](./assets/rl_train_reward_80mm_30slope.png)
-
-50mm / 38mm / 80mm baselines are plotted through ~301M steps. The 80mm 30° slope curve covers logged evals through ~1.01B steps.
+50mm (`...20260801-122434-baseline`), 38mm (`...113909-baseline`), and 80mm (`...123345-baseline`) through ~301M steps; 80mm 30° slope (`...half_action_scale_1b`) through ~1.01B steps.
 
 ## Real-hand RL inference
 
